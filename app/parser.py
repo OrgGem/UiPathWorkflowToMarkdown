@@ -75,6 +75,7 @@ def _find_invoked_workflows(element: ElementTree.Element, workflows: List[str]) 
 
 
 LOGIC_ACTIVITY_NAMES = KEY_ACTIVITY_NAMES | {
+    # Control and orchestration activities we want to surface in logic flow
     "InvokeWorkflowFile",
     "FlowDecision",
     "FlowSwitch",
@@ -91,6 +92,12 @@ LOGIC_ACTIVITY_NAMES = KEY_ACTIVITY_NAMES | {
 }
 
 
+def _branch_label(name: str) -> str | None:
+    """Return a normalized branch label when applicable."""
+    label = name.split(".")[-1]
+    return label if label in {"Then", "Else", "Case", "Default"} else None
+
+
 def _collect_logic_flow(
     element: ElementTree.Element,
     steps: List[Tuple[int, str]],
@@ -100,29 +107,29 @@ def _collect_logic_flow(
     """Recursively collect a hierarchical logic flow with branch annotations."""
     tag_name = get_local_name(element.tag)
     display = element.get("DisplayName")
-    should_record = display or tag_name in LOGIC_ACTIVITY_NAMES
+    should_record = tag_name in LOGIC_ACTIVITY_NAMES or (
+        display is not None and tag_name not in {"Activity"}
+    )
 
+    current_depth = depth
     if should_record:
         label = f"{branch_label}: " if branch_label else ""
         text = f"{label}{display or tag_name}"
         if display and display != tag_name:
             text = f"{text} [{tag_name}]"
         steps.append((depth, text))
-        depth += 1
+        current_depth = depth + 1
 
     for child in element:
         child_name = get_local_name(child.tag)
-        is_branch = child_name in {"Then", "Else", "Case", "Default"} or child_name.endswith(
-            (".Then", ".Else", ".Case", ".Default")
-        )
-        if is_branch:
-            label_name = child_name.split(".")[-1]
+        label_name = _branch_label(child_name)
+        if label_name:
             for nested in child:
                 _collect_logic_flow(
-                    nested, steps, depth, branch_label=label_name
+                    nested, steps, current_depth, branch_label=label_name
                 )
         else:
-            _collect_logic_flow(child, steps, depth, branch_label=None)
+            _collect_logic_flow(child, steps, current_depth, branch_label=None)
 
 
 def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
