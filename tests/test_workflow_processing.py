@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.llm import enrich_with_llm
 from app.main import app
 from app.markdown_gen import build_markdown
-from app.parser import WorkflowData
+from app.parser import WorkflowData, parse_project
 
 
 SAMPLE_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
@@ -22,6 +22,25 @@ CHILD_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
 <Activity x:Class=\"Child\" xmlns=\"http://schemas.microsoft.com/netfx/2009/xaml/activities\" xmlns:ui=\"http://schemas.uipath.com/workflow/activities\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">
   <Sequence DisplayName=\"Child Sequence\">
     <ui:TypeInto DisplayName=\"Type Hello\" />
+  </Sequence>
+</Activity>
+"""
+
+NESTED_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<Activity x:Class=\"Login\" xmlns=\"http://schemas.microsoft.com/netfx/2009/xaml/activities\" xmlns:ui=\"http://schemas.uipath.com/workflow/activities\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">
+  <Sequence DisplayName=\"Login Flow\">
+    <If DisplayName=\"Check Login Success\">
+      <If.Then>
+        <Sequence DisplayName=\"Success Branch\">
+          <ui:Click DisplayName=\"Open Dashboard\" />
+        </Sequence>
+      </If.Then>
+      <If.Else>
+        <Sequence DisplayName=\"Retry Branch\">
+          <ui:InvokeWorkflowFile DisplayName=\"Retry Login\" WorkflowFileName=\"Retry.xaml\" />
+        </Sequence>
+      </If.Else>
+    </If>
   </Sequence>
 </Activity>
 """
@@ -73,3 +92,18 @@ def test_upload_endpoint_processes_zip():
     assert response.status_code == 200
     assert "UiPath Project Summary" in response.text
     assert "Main.xaml" in response.text
+
+
+def test_markdown_includes_nested_logic_flow(tmp_path):
+    xaml_path = tmp_path / "Login.xaml"
+    xaml_path.write_text(NESTED_XAML, encoding="utf-8")
+
+    workflows = parse_project(tmp_path)
+    markdown = build_markdown(workflows)
+
+    assert "Logic flow" in markdown
+    assert "Login Flow [Sequence]" in markdown
+    assert "Check Login Success [If]" in markdown
+    assert "Then: Success Branch [Sequence]" in markdown
+    assert "Else: Retry Branch [Sequence]" in markdown
+    assert "Retry Login [InvokeWorkflowFile]" in markdown

@@ -5,6 +5,8 @@ from typing import Dict, List, Set
 
 from .parser import WorkflowData
 
+INDENT = "  "
+
 
 def generate_markdown(
     workflow_path: str,
@@ -25,21 +27,26 @@ def generate_markdown(
     visited.add(workflow_path)
 
     lines: List[str] = []
-    prefix = "  " * level
+    prefix = INDENT * level
     workflow_data = workflows.get(workflow_path)
     name = Path(workflow_path).name
     lines.append(f"{prefix}- **{name}**")
 
     if llm_descriptions and workflow_path in llm_descriptions:
-        lines.append(f"{prefix}  > {llm_descriptions[workflow_path]}")
+        lines.append(f"{prefix}{INDENT}> {llm_descriptions[workflow_path]}")
 
     if workflow_data and workflow_data.key_activities:
         lines.append(
-            f"{prefix}  - Key activities: {', '.join(workflow_data.key_activities)}"
+            f"{prefix}{INDENT}- Key activities: {', '.join(workflow_data.key_activities)}"
         )
 
+    if workflow_data and workflow_data.logic_flow:
+        lines.append(f"{prefix}{INDENT}- Logic flow:")
+        for depth, step in workflow_data.logic_flow:
+            lines.append(f"{prefix}{INDENT * (depth + 2)}- {step}")
+
     if workflow_data and workflow_data.invoked_workflows:
-        lines.append(f"{prefix}  - Invokes:")
+        lines.append(f"{prefix}{INDENT}- Invokes:")
         for child in workflow_data.invoked_workflows:
             lines.extend(
                 generate_markdown(
@@ -140,4 +147,3 @@ def build_sequence_markdown(
 
     lines.append("```")
     return "\n".join(lines).strip() + "\n"
-

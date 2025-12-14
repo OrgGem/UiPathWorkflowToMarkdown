@@ -26,9 +26,11 @@ frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 ui_dir = Path(__file__).resolve().parent.parent / "ui" / "dist"
 
 # Prefer the new Vue UI if it exists, otherwise fall back to the old React frontend
+assets_dir = ui_dir / "assets"
 if ui_dir.exists():
-    app.mount("/assets", StaticFiles(directory=str(ui_dir / "assets")), name="assets")
-    
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
     @app.get("/", response_class=HTMLResponse)
     def read_root():
         index_path = ui_dir / "index.html"

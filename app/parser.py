@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
@@ -28,6 +28,7 @@ class WorkflowData:
     display_name: str
     invoked_workflows: List[str]
     key_activities: List[str]
+    logic_flow: List[Tuple[int, str]] = field(default_factory=list)
 
 
 def get_local_name(tag: str) -> str:
@@ -73,6 +74,64 @@ def _find_invoked_workflows(element: ElementTree.Element, workflows: List[str]) 
         _find_invoked_workflows(child, workflows)
 
 
+LOGIC_ACTIVITY_NAMES = KEY_ACTIVITY_NAMES | {
+    # Control and orchestration activities we want to surface in logic flow
+    "InvokeWorkflowFile",
+    "FlowDecision",
+    "FlowSwitch",
+    "Switch",
+    "TryCatch",
+    "Catch",
+    "Finally",
+    "Pick",
+    "Parallel",
+    "State",
+    "StateMachine",
+    "Flowchart",
+    "FlowStep",
+}
+
+
+def _branch_label(name: str) -> str | None:
+    """Return a normalized branch label when applicable."""
+    label = name.split(".")[-1]
+    return label if label in {"Then", "Else", "Case", "Default"} else None
+
+
+def _collect_logic_flow(
+    element: ElementTree.Element,
+    steps: List[Tuple[int, str]],
+    depth: int = 0,
+    branch_label: str | None = None,
+) -> None:
+    """Recursively collect a hierarchical logic flow with branch annotations."""
+    tag_name = get_local_name(element.tag)
+    display = element.get("DisplayName")
+    should_record = tag_name in LOGIC_ACTIVITY_NAMES or (
+        display is not None and tag_name not in {"Activity"}
+    )
+
+    current_depth = depth
+    if should_record:
+        label = f"{branch_label}: " if branch_label else ""
+        text = f"{label}{display or tag_name}"
+        if display and display != tag_name:
+            text = f"{text} [{tag_name}]"
+        steps.append((depth, text))
+        current_depth = depth + 1
+
+    for child in element:
+        child_name = get_local_name(child.tag)
+        label_name = _branch_label(child_name)
+        if label_name:
+            for nested in child:
+                _collect_logic_flow(
+                    nested, steps, current_depth, branch_label=label_name
+                )
+        else:
+            _collect_logic_flow(child, steps, current_depth, branch_label=None)
+
+
 def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
     """Parse a single XAML file into workflow data."""
     tree = ElementTree.parse(xaml_path)
@@ -80,9 +139,12 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
 
     invoked_workflows: List[str] = []
     key_activities: List[str] = []
+    logic_flow: List[Tuple[int, str]] = []
 
     _find_invoked_workflows(root, invoked_workflows)
     _collect_key_activities(root, key_activities)
+    for child in root:
+        _collect_logic_flow(child, logic_flow)
 
     relative_path = str(xaml_path.relative_to(base_dir))
     display_name = root.get("DisplayName") or xaml_path.stem
@@ -92,6 +154,7 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
         display_name=display_name,
         invoked_workflows=invoked_workflows,
         key_activities=key_activities,
+        logic_flow=logic_flow,
     )
 
 
@@ -113,4 +176,3 @@ def load_config(config_str: str | None) -> dict:
         return json.loads(config_str)
     except json.JSONDecodeError:
         return {}
-
