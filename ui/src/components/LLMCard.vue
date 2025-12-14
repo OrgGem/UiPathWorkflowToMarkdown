@@ -198,11 +198,7 @@ const runLLMProcessing = async () => {
         const existingFile = updatedFiles[fileIndex];
         if (existingFile) {
           updatedFiles[fileIndex] = {
-            path: existingFile.path,
-            size: existingFile.size,
-            checksum: existingFile.checksum,
-            content: existingFile.content,
-            selected: existingFile.selected,
+            ...existingFile,
             llmProcessed: true,
             llmContent,
           };
