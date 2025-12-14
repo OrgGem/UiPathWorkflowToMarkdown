@@ -25,7 +25,7 @@ def enrich_with_llm(
 
     try:
         from openai import OpenAI
-    except Exception:
+    except ImportError:
         return {}
 
     client = OpenAI(api_key=api_key, base_url=base_url)
@@ -58,4 +58,3 @@ def enrich_with_llm(
             continue
 
     return summaries
-

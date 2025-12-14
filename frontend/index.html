@@ -63,6 +63,15 @@
         const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
         const [status, setStatus] = useState("");
         const [markdown, setMarkdown] = useState("");
+        const originIsHttp =
+          typeof window !== "undefined" &&
+          window.location &&
+          window.location.origin &&
+          window.location.origin.startsWith("http");
+        const apiRoot = originIsHttp
+          ? window.location.origin
+          : "http://localhost:8000";
+        const apiUrl = `${apiRoot.replace(/\/$/, "")}/analyze/upload/`;
 
         const handleSubmit = async (e) => {
           e.preventDefault();
@@ -86,7 +95,7 @@
           }
 
           try {
-            const response = await fetch("http://localhost:8000/analyze/upload/", {
+            const response = await fetch(apiUrl, {
               method: "POST",
               body: formData,
             });

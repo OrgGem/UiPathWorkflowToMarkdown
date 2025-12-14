@@ -25,13 +25,14 @@ async def analyze_upload(
     file: UploadFile = File(...), config: Optional[str] = Form(None)
 ):
     """Analyze an uploaded UiPath project and return a Markdown document."""
-    if not file.filename.lower().endswith((".zip", ".nupkg")):
+    filename = file.filename or ""
+    if not filename.lower().endswith((".zip", ".nupkg")):
         raise HTTPException(
             status_code=400, detail="Only .zip or .nupkg project archives are supported."
         )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        upload_path = Path(tmpdir) / file.filename
+        upload_path = Path(tmpdir) / (filename or "upload.zip")
         content = await file.read()
         upload_path.write_bytes(content)
 
@@ -56,4 +57,3 @@ if __name__ == "__main__":  # pragma: no cover
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
