@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UiPath Flow Visualizer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 2rem;
+        background: #f7f9fb;
+      }
+      .card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        padding: 1.5rem;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-weight: 600;
+      }
+      input[type="file"],
+      input[type="text"],
+      input[type="password"],
+      button {
+        margin-top: 0.5rem;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      textarea {
+        width: 100%;
+        min-height: 220px;
+        margin-top: 1rem;
+        padding: 0.5rem;
+        font-family: monospace;
+      }
+      .status {
+        margin-top: 0.5rem;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/javascript">
+      const { useState } = React;
+
+      function App() {
+        const [file, setFile] = useState(null);
+        const [enableAI, setEnableAI] = useState(false);
+        const [apiKey, setApiKey] = useState("");
+        const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
+        const [status, setStatus] = useState("");
+        const [markdown, setMarkdown] = useState("");
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          if (!file) {
+            setStatus("Please choose a .zip or .nupkg file.");
+            return;
+          }
+          setStatus("Analyzing...");
+          setMarkdown("");
+          const formData = new FormData();
+          formData.append("file", file);
+
+          if (enableAI) {
+            const config = {
+              use_llm: true,
+              llm_provider: "openai_compatible",
+              api_key: apiKey,
+              base_url: baseUrl,
+            };
+            formData.append("config", JSON.stringify(config));
+          }
+
+          try {
+            const response = await fetch("http://localhost:8000/analyze/upload/", {
+              method: "POST",
+              body: formData,
+            });
+            const text = await response.text();
+            if (!response.ok) {
+              setStatus(`Error: ${text}`);
+              return;
+            }
+            setMarkdown(text);
+            setStatus("Completed");
+          } catch (error) {
+            setStatus("Request failed. Is the API running?");
+          }
+        };
+
+        const download = () => {
+          const blob = new Blob([markdown], { type: "text/markdown" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "analysis.md";
+          link.click();
+        };
+
+        return React.createElement(
+          "div",
+          { className: "card" },
+          React.createElement("h1", null, "UiPath Flow Visualizer"),
+          React.createElement(
+            "form",
+            { onSubmit: handleSubmit },
+            React.createElement(
+              "label",
+              null,
+              "Project Archive (.zip/.nupkg)",
+              React.createElement("input", {
+                type: "file",
+                accept: ".zip,.nupkg",
+                onChange: (e) => setFile(e.target.files[0] || null),
+                required: true,
+              })
+            ),
+            React.createElement(
+              "div",
+              { className: "toggle" },
+              React.createElement("input", {
+                type: "checkbox",
+                id: "enable-ai",
+                checked: enableAI,
+                onChange: (e) => setEnableAI(e.target.checked),
+              }),
+              React.createElement("label", { htmlFor: "enable-ai" }, "Enable AI Descriptions (optional)")
+            ),
+            enableAI &&
+              React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(
+                  "label",
+                  null,
+                  "API Key",
+                  React.createElement("input", {
+                    type: "password",
+                    value: apiKey,
+                    onChange: (e) => setApiKey(e.target.value),
+                    placeholder: "sk-...",
+                    required: true,
+                  })
+                ),
+                React.createElement(
+                  "label",
+                  null,
+                  "Base URL",
+                  React.createElement("input", {
+                    type: "text",
+                    value: baseUrl,
+                    onChange: (e) => setBaseUrl(e.target.value),
+                  })
+                )
+              ),
+            React.createElement(
+              "button",
+              { type: "submit" },
+              "Analyze"
+            )
+          ),
+          status && React.createElement("div", { className: "status" }, status),
+          markdown &&
+            React.createElement(
+              React.Fragment,
+              null,
+              React.createElement("textarea", {
+                readOnly: true,
+                value: markdown,
+              }),
+              React.createElement(
+                "button",
+                { type: "button", onClick: download },
+                "Download Markdown"
+              )
+            )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(
+        React.createElement(App)
+      );
+    </script>
+  </body>
+</html>
