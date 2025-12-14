@@ -77,3 +77,67 @@ def build_markdown(workflows: Dict[str, WorkflowData], llm_descriptions=None) ->
 
     return "\n".join(lines).strip() + "\n"
 
+
+def build_sequence_markdown(
+    workflows: Dict[str, WorkflowData], llm_descriptions: Dict[str, str] | None = None
+) -> str:
+    """
+    Build a Mermaid sequence diagram representing workflow invocations.
+
+    - Each workflow is a participant.
+    - Each `InvokeWorkflowFile` becomes a message from caller to callee.
+    - Key activities of the callee are included as a note.
+    - Optional LLM descriptions are appended in the note.
+    """
+    # Determine roots to start traversal (workflows that are not invoked by others)
+    invoked = {t for d in workflows.values() for t in d.invoked_workflows}
+    roots = [p for p in workflows if p not in invoked] or list(workflows)
+
+    # Map workflow path to a safe Mermaid participant name
+    def pname(path: str) -> str:
+        return Path(path).stem.replace(" ", "_")
+
+    # Collect all participants
+    participants: List[str] = []
+    for wf in sorted(workflows):
+        participants.append(f"participant {pname(wf)} as {Path(wf).name}")
+
+    lines: List[str] = ["# UiPath Project Sequence", "", "```mermaid", "sequenceDiagram"]
+    lines.extend(participants)
+
+    visited: Set[str] = set()
+
+    def walk(caller_path: str) -> None:
+        if caller_path in visited:
+            return
+        visited.add(caller_path)
+        caller = workflows.get(caller_path)
+        if not caller:
+            return
+        for callee_path in caller.invoked_workflows:
+            lines.append(f"{pname(caller_path)}->>+{pname(callee_path)}: Invoke")
+            callee = workflows.get(callee_path)
+            # Add a note describing the callee's logic
+            if callee:
+                note_lines: List[str] = []
+                if callee.key_activities:
+                    note_lines.append(
+                        "Key activities: " + ", ".join(callee.key_activities)
+                    )
+                if llm_descriptions and callee_path in llm_descriptions:
+                    note_lines.append(llm_descriptions[callee_path])
+                if note_lines:
+                    # Use a Note over the callee participant
+                    lines.append(
+                        f"Note over {pname(callee_path)}: "
+                        + "\\n".join(note_lines).replace("\n", " ")
+                    )
+            walk(callee_path)
+            lines.append(f"{pname(caller_path)}<<- {pname(callee_path)}: Return")
+
+    for root in sorted(roots):
+        walk(root)
+
+    lines.append("```")
+    return "\n".join(lines).strip() + "\n"
+

@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse
+from starlette.staticfiles import StaticFiles
 
 from .llm import enrich_with_llm
-from .markdown_gen import build_markdown
+from .markdown_gen import build_markdown, build_sequence_markdown
 from .parser import load_config, parse_project, safe_extract_archive
 
 app = FastAPI(
@@ -18,6 +19,18 @@ app = FastAPI(
         "Optional AI enrichment is supported via the config field."
     ),
 )
+
+# Serve the static frontend and make "/" return index.html
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+if frontend_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dir), html=True), name="static")
+
+    @app.get("/", response_class=HTMLResponse)
+    def read_root():
+        index_path = frontend_dir / "index.html"
+        if index_path.exists():
+            return index_path.read_text(encoding="utf-8")
+        return "<h1>Frontend not found</h1>"
 
 
 @app.post("/analyze/upload/", response_class=PlainTextResponse)
@@ -48,7 +61,12 @@ async def analyze_upload(
 
         cfg = load_config(config)
         llm_descriptions = enrich_with_llm(workflows, cfg)
-        markdown = build_markdown(workflows, llm_descriptions or None)
+        # Choose output format: default list or Mermaid sequence diagram
+        output_format = (cfg or {}).get("format")
+        if output_format == "sequence":
+            markdown = build_sequence_markdown(workflows, llm_descriptions or None)
+        else:
+            markdown = build_markdown(workflows, llm_descriptions or None)
         headers = {"Content-Disposition": 'attachment; filename="analysis.md"'}
         return PlainTextResponse(markdown, media_type="text/markdown", headers=headers)
 
