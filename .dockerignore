@@ -1,18 +1,39 @@
+# Git files
 .git
 .gitignore
+
+# Python cache
 __pycache__
 *.pyc
 *.pyo
 *.pyd
-*.swp
-*.swo
-*.DS_Store
-.env
-.venv
-.env.local
-node_modules
-frontend/node_modules
-*.log
+.pytest_cache
 .coverage
 htmlcov
+
+# Python virtual environments
+.env
+.venv
+venv/
+env/
+
+# Node.js
+ui/node_modules
+ui/dist
+ui/.vite
+node_modules
+
+# Legacy frontend (being removed)
+frontend/
+
+# IDE and OS files
+*.swp
+*.swo
+.DS_Store
+*.log
+.vscode
+.idea
+
+# Tests
+tests/
 .tests_cache

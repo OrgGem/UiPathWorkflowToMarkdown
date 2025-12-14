@@ -1,4 +1,21 @@
-# Minimal production image for UiPath Workflow to Markdown
+# ============================================
+# Stage 1: Build the Vue.js Frontend
+# ============================================
+FROM node:20-alpine AS ui-builder
+
+WORKDIR /ui
+
+# Copy package files and install dependencies
+COPY ui/package*.json ./
+RUN npm ci --only=production
+
+# Copy UI source code and build
+COPY ui/ ./
+RUN npm run build
+
+# ============================================
+# Stage 2: Python Backend + Built UI
+# ============================================
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -6,16 +23,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system deps (none required currently) and Python deps
+# Install Python dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy backend application code
 COPY app ./app
-COPY frontend ./frontend
+
+# Copy built UI from the builder stage
+COPY --from=ui-builder /ui/dist ./ui/dist
+
+# Copy additional files
 COPY README.md ./
 
 EXPOSE 8000
 
-# Default command to serve the API
+# Start the FastAPI server (which now serves both API and UI)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
