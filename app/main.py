@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Body
-from fastapi.responses import PlainTextResponse, HTMLResponse
-from starlette.staticfiles import StaticFiles
+from fastapi.responses import PlainTextResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .llm import enrich_with_llm
@@ -20,32 +20,6 @@ app = FastAPI(
         "Optional AI enrichment is supported via the config field."
     ),
 )
-
-# Serve the static frontend and make "/" return index.html
-frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-ui_dir = Path(__file__).resolve().parent.parent / "ui" / "dist"
-
-# Prefer the new Vue UI if it exists, otherwise fall back to the old React frontend
-assets_dir = ui_dir / "assets"
-if ui_dir.exists():
-    if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-
-    @app.get("/", response_class=HTMLResponse)
-    def read_root():
-        index_path = ui_dir / "index.html"
-        if index_path.exists():
-            return index_path.read_text(encoding="utf-8")
-        return "<h1>Frontend not found</h1>"
-elif frontend_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_dir), html=True), name="static")
-
-    @app.get("/", response_class=HTMLResponse)
-    def read_root():
-        index_path = frontend_dir / "index.html"
-        if index_path.exists():
-            return index_path.read_text(encoding="utf-8")
-        return "<h1>Frontend not found</h1>"
 
 
 @app.post("/analyze/upload/", response_class=PlainTextResponse)
@@ -131,6 +105,39 @@ async def ingest_workflows(request: IngestRequest = Body(...)):
         markdown = build_markdown(workflows, None)
         headers = {"Content-Disposition": 'attachment; filename="analysis.md"'}
         return PlainTextResponse(markdown, media_type="text/markdown", headers=headers)
+
+
+# --- UI SERVING CONFIGURATION FOR PRODUCTION ---
+UI_BUILD_DIR = Path(__file__).resolve().parent.parent / "ui" / "dist"
+
+# Mount static assets (JS, CSS, images from Vite build)
+if UI_BUILD_DIR.exists():
+    assets_dir = UI_BUILD_DIR / "assets"
+    if assets_dir.exists():
+        app.mount(
+            "/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="ui-assets"
+        )
+    
+    # Catch-all route for SPA (must be last, after all API routes)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # Don't intercept API routes
+        if full_path.startswith("api/") or full_path.startswith("analyze/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Check if requesting a specific file in the build directory
+        file_path = UI_BUILD_DIR / full_path
+        if file_path.is_file() and file_path.exists():
+            return FileResponse(file_path)
+        
+        # Default to index.html for client-side routing
+        index_path = UI_BUILD_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+        
+        return {"error": "UI not built. Run 'npm run build' in /ui directory"}
 
 
 if __name__ == "__main__":  # pragma: no cover

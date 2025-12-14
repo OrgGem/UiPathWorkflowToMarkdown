@@ -103,7 +103,8 @@ const sendToBackend = async () => {
 
   try {
     // Determine the API endpoint
-    const baseUrl = props.apiUrl || window.location.origin;
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const baseUrl = props.apiUrl || apiBaseUrl || window.location.origin;
     const endpoint = `${baseUrl}/api/workflows/ingest`;
 
     // Prepare the payload
