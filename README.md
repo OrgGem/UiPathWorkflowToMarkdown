@@ -2,6 +2,41 @@
 
 Upload a UiPath project archive (`.zip` or `.nupkg`) and receive a Markdown document that visualizes the workflow structure. Optional LLM enrichment can add human-readable summaries.
 
+## Features
+
+### Core Parsing & Analysis
+- **XAML Workflow Parsing**: Extract and analyze UiPath workflow files from `.zip` or `.nupkg` archives
+- **Hierarchical Workflow Structure**: Automatically detect workflow invocation chains and display as nested structure
+- **Activity Detection**: Identify and list key activities (TypeInto, Click, If, ForEach, Assign, While, etc.)
+- **Logic Flow Visualization**: Hierarchical representation of workflow logic with branch annotations (Then/Else/Case)
+- **Control Flow Analysis**: Detect control structures (FlowDecision, FlowSwitch, Switch, TryCatch, Parallel, etc.)
+- **Safe Archive Extraction**: Path traversal protection when extracting uploaded archives
+
+### Output Formats
+- **Markdown List Format**: Hierarchical list view with workflow structure, activities, and logic flow (default)
+- **Mermaid Sequence Diagrams**: Generate interactive sequence diagrams showing workflow invocations with Mermaid syntax
+  - Set `"format": "sequence"` in config to enable
+
+### AI Enhancement (Optional)
+- **LLM-Powered Summaries**: Generate human-readable business purpose descriptions for each workflow
+- **OpenAI-Compatible APIs**: Supports OpenAI and compatible endpoints (local LLMs, Azure, etc.)
+- **Configurable Models**: Choose any model (default: gpt-4o-mini)
+- **Privacy-Focused**: API keys only used server-side when explicitly provided
+- **Graceful Fallback**: Core parsing works without LLM - AI is purely optional
+
+### Frontend Features (Vue 3 SPA)
+- **Client-Side Archive Processing**: Extract and analyze workflows in the browser using JSZip
+- **File Management**: View discovered XAML files with paths, sizes, and SHA-256 checksums
+- **Frontend LLM Processing**: Optional client-side LLM preprocessing with custom prompts (API keys stay in browser)
+- **Selective Processing**: Choose which files to process and send to backend
+- **Live Preview**: View generated Markdown analysis with download option
+- **Modern UI**: Dark theme with glassmorphism effects, gradient accents, and smooth animations
+
+### API Endpoints
+- **`/analyze/upload/`**: Upload archive, get Markdown analysis (supports both formats and LLM)
+- **`/api/workflows/ingest`**: Accept pre-processed XAML files from frontend for backend-only parsing
+- **`/docs`**: Interactive API documentation (FastAPI/Swagger)
+
 ## Architecture
 
 - **Backend**: Python/FastAPI in `/app` - Headless API server
@@ -85,6 +120,13 @@ curl -X POST "http://localhost:8000/analyze/upload/" \
 - `file`: UiPath project archive (`.zip`/`.nupkg`)
 - `config` (optional): JSON string for configuration
 
+**Configuration Options:**
+- `use_llm` (boolean): Enable LLM-powered workflow summaries (default: false)
+- `api_key` (string): API key for LLM provider (required if use_llm is true)
+- `base_url` (string): Base URL for OpenAI-compatible API (optional)
+- `model` (string): Model to use (default: "gpt-4o-mini")
+- `format` (string): Output format - "list" (default) or "sequence" (Mermaid diagram)
+
 **Example with LLM enrichment:**
 
 ```json
@@ -92,7 +134,17 @@ curl -X POST "http://localhost:8000/analyze/upload/" \
   "use_llm": true,
   "llm_provider": "openai_compatible",
   "api_key": "sk-...",
-  "base_url": "https://api.openai.com/v1"
+  "base_url": "https://api.openai.com/v1",
+  "model": "gpt-4o-mini"
+}
+```
+
+**Example with Mermaid sequence diagram:**
+
+```json
+{
+  "use_llm": false,
+  "format": "sequence"
 }
 ```
 
@@ -122,6 +174,25 @@ curl -X POST "http://localhost:8000/api/workflows/ingest" \
 - `checksum`: SHA-256 checksum
 - `content`: XAML file content (raw or LLM-processed)
 - `llmProcessed`: Boolean indicating if LLM preprocessing was applied
+
+## Supported UiPath Activities
+
+The parser recognizes and extracts the following activity types:
+
+**Key Activities:**
+- TypeInto, Click, Assign
+- If, Switch, While, DoWhile, ForEach
+- Sequence
+
+**Control Flow & Logic:**
+- InvokeWorkflowFile
+- FlowDecision, FlowSwitch
+- TryCatch, Catch, Finally
+- Pick, Parallel
+- Flowchart, FlowStep
+- StateMachine, State
+
+The logic flow visualization includes branch annotations (Then/Else/Case/Default) to show conditional paths.
 
 ## Frontend Features
 
