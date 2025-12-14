@@ -7,7 +7,7 @@ WORKDIR /ui
 
 # Copy package files and install dependencies
 COPY ui/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy UI source code and build
 COPY ui/ ./
