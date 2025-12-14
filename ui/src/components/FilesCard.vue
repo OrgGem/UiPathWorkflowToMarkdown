@@ -1,23 +1,23 @@
 <template>
-  <div class="glass-card p-6">
-    <h2 class="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+  <div class="glass-card p-5">
+    <h2 class="text-xl font-semibold mb-4 text-white">
       Discovered Files
     </h2>
     
-    <div v-if="files.length === 0" class="text-center py-8 text-gray-500">
+    <div v-if="files.length === 0" class="text-center py-8 text-gray-500 text-sm">
       No files discovered yet. Upload an archive to get started.
     </div>
 
     <div v-else>
-      <div class="flex items-center justify-between mb-4">
-        <p class="text-gray-400">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-gray-400 text-sm">
           {{ files.length }} XAML file(s) found, {{ selectedCount }} selected
         </p>
         <div class="flex gap-2">
-          <button @click="selectAll" class="glass-button-secondary px-4 py-2 text-sm">
+          <button @click="selectAll" class="glass-button-secondary px-3 py-1.5 text-xs">
             Select All
           </button>
-          <button @click="selectNone" class="glass-button-secondary px-4 py-2 text-sm">
+          <button @click="selectNone" class="glass-button-secondary px-3 py-1.5 text-xs">
             Select None
           </button>
         </div>
@@ -27,23 +27,23 @@
         <div
           v-for="(file, index) in files"
           :key="file.checksum"
-          class="flex items-center gap-3 p-4 rounded-lg transition-all cursor-pointer"
-          :class="file.selected ? 'bg-purple-500/20 border border-purple-500/50' : 'bg-glass/30 border border-white/10 hover:bg-glass/50'"
+          class="flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer"
+          :class="file.selected ? 'bg-purple-500/10 border border-purple-600' : 'bg-gray-800/30 border border-gray-700 hover:bg-gray-800/50'"
           @click="toggleSelection(index)"
         >
           <input
             type="checkbox"
             :checked="file.selected"
             @change.stop="toggleSelection(index)"
-            class="w-5 h-5 rounded border-gray-600 bg-glass text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+            class="w-4 h-4 rounded border-gray-600 bg-gray-900 text-purple-600 focus:ring-purple-600 focus:ring-offset-0"
           />
           
           <div class="flex-1 min-w-0">
-            <p class="text-white font-medium truncate">{{ file.path }}</p>
-            <div class="flex items-center gap-4 text-xs text-gray-400 mt-1">
+            <p class="text-white text-sm font-medium truncate">{{ file.path }}</p>
+            <div class="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
               <span>{{ formatBytes(file.size) }}</span>
               <span class="font-mono">{{ file.checksum.slice(0, 8) }}...</span>
-              <span v-if="file.llmProcessed" class="text-purple-500">✓ LLM Processed</span>
+              <span v-if="file.llmProcessed" class="text-purple-400">✓ LLM Processed</span>
             </div>
           </div>
 

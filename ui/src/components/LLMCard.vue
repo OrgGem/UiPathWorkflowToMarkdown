@@ -1,6 +1,6 @@
 <template>
-  <div class="glass-card p-6">
-    <h2 class="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+  <div class="glass-card p-5">
+    <h2 class="text-xl font-semibold mb-4 text-white">
       LLM Preprocessing
     </h2>
     

@@ -38,24 +38,22 @@ const closeFileViewer = () => {
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8">
-    <div class="max-w-7xl mx-auto">
+  <div class="min-h-screen p-6 md:p-8">
+    <div class="max-w-6xl mx-auto">
       <!-- Header -->
-      <header class="text-center mb-8">
-        <h1 class="text-5xl font-bold mb-3">
-          <span class="bg-gradient-to-r from-purple-500 via-blue-500 to-pink-500 bg-clip-text text-transparent">
-            UiPath Workflow Analyzer
-          </span>
+      <header class="text-center mb-10">
+        <h1 class="text-4xl font-semibold mb-2 text-white">
+          UiPath Workflow Analyzer
         </h1>
-        <p class="text-gray-400 text-lg">
+        <p class="text-gray-400 text-base">
           Upload, analyze, and process UiPath workflows with optional LLM enhancement
         </p>
       </header>
 
       <!-- Main Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <!-- Left Column -->
-        <div class="space-y-6">
+        <div class="space-y-5">
           <UploadCard @files-discovered="handleFilesDiscovered" />
           <LLMCard 
             :config="llmConfig"
@@ -66,7 +64,7 @@ const closeFileViewer = () => {
         </div>
 
         <!-- Right Column -->
-        <div class="space-y-6">
+        <div class="space-y-5">
           <FilesCard 
             :files="files"
             @update="handleFilesUpdate"
@@ -77,15 +75,15 @@ const closeFileViewer = () => {
       </div>
 
       <!-- Footer -->
-      <footer class="text-center mt-12 text-gray-500 text-sm">
-        <p>Factory.ai-inspired styling · Vue 3 + Vite + TypeScript</p>
+      <footer class="text-center mt-12 text-gray-600 text-xs">
+        <p>Vue 3 + Vite + TypeScript</p>
       </footer>
     </div>
 
     <!-- File Viewer Modal -->
     <div
       v-if="viewingFile"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
       @click="closeFileViewer"
     >
       <div

@@ -1,15 +1,15 @@
 <template>
-  <div class="glass-card p-6">
-    <h2 class="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+  <div class="glass-card p-5">
+    <h2 class="text-xl font-semibold mb-4 text-white">
       Upload Archive
     </h2>
-    <p class="text-gray-400 mb-4">
+    <p class="text-gray-400 mb-4 text-sm">
       Select a UiPath project archive (.zip or .nupkg) to analyze
     </p>
     
     <div 
-      class="border-2 border-dashed rounded-lg p-8 text-center transition-colors"
-      :class="dragActive ? 'border-purple-500 bg-purple-500/10' : 'border-white/10'"
+      class="border-2 border-dashed rounded-md p-6 text-center transition-colors"
+      :class="dragActive ? 'border-purple-500 bg-purple-500/5' : 'border-gray-700'"
       @dragover.prevent="dragActive = true"
       @dragleave.prevent="dragActive = false"
       @drop.prevent="handleDrop"
@@ -23,22 +23,22 @@
       />
       
       <div v-if="!file" class="cursor-pointer" @click="() => fileInput?.click()">
-        <svg class="w-16 h-16 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
-        <p class="text-gray-300 mb-2">Click to browse or drag and drop</p>
-        <p class="text-sm text-gray-500">.zip or .nupkg files</p>
+        <p class="text-gray-300 mb-1 text-sm">Click to browse or drag and drop</p>
+        <p class="text-xs text-gray-500">.zip or .nupkg files</p>
       </div>
       
       <div v-else class="text-left">
-        <div class="flex items-center justify-between bg-glass/50 rounded-lg p-4">
+        <div class="flex items-center justify-between bg-gray-800/50 rounded-md p-3">
           <div class="flex items-center space-x-3">
-            <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-7 h-7 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <div>
-              <p class="font-medium text-white">{{ file.name }}</p>
-              <p class="text-sm text-gray-400">{{ formatBytes(file.size) }}</p>
+              <p class="font-medium text-white text-sm">{{ file.name }}</p>
+              <p class="text-xs text-gray-400">{{ formatBytes(file.size) }}</p>
             </div>
           </div>
           <button
@@ -62,11 +62,11 @@
     </button>
 
     <div v-if="processing" class="mt-4 text-center">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-      <p class="text-gray-400 mt-2">{{ status }}</p>
+      <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+      <p class="text-gray-400 mt-2 text-sm">{{ status }}</p>
     </div>
 
-    <div v-if="error" class="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
+    <div v-if="error" class="mt-4 p-3 bg-red-900/20 border border-red-800 rounded-md text-red-400 text-sm">
       {{ error }}
     </div>
   </div>
