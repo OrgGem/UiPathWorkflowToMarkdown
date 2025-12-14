@@ -19,7 +19,7 @@ env/
 
 # Node.js
 ui/node_modules
-ui/dist
+ui/dist       # Built by Stage 1, not copied from host
 ui/.vite
 node_modules
 

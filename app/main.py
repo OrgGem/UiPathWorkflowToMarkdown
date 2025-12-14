@@ -125,7 +125,7 @@ if UI_BUILD_DIR.exists():
     async def serve_spa(full_path: str):
         # Don't intercept API routes
         if full_path.startswith("api/") or full_path.startswith("analyze/"):
-            return {"error": "Not found"}
+            raise HTTPException(status_code=404, detail="Not found")
         
         # Check if requesting a specific file in the build directory
         file_path = UI_BUILD_DIR / full_path
