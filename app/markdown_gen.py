@@ -38,6 +38,11 @@ def generate_markdown(
             f"{prefix}  - Key activities: {', '.join(workflow_data.key_activities)}"
         )
 
+    if workflow_data and workflow_data.logic_flow:
+        lines.append(f"{prefix}  - Logic flow:")
+        for depth, step in workflow_data.logic_flow:
+            lines.append(f"{prefix}    {'  ' * depth}- {step}")
+
     if workflow_data and workflow_data.invoked_workflows:
         lines.append(f"{prefix}  - Invokes:")
         for child in workflow_data.invoked_workflows:
@@ -140,4 +145,3 @@ def build_sequence_markdown(
 
     lines.append("```")
     return "\n".join(lines).strip() + "\n"
-
