@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .parser import WorkflowData
 
@@ -10,7 +10,7 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 
-def _logic_flow_as_text(logic_flow: List[tuple[int, str]]) -> str:
+def _logic_flow_as_text(logic_flow: List[Tuple[int, str]]) -> str:
     """Render the collected logic flow into a readable text block."""
     lines: List[str] = []
     for depth, step in logic_flow:

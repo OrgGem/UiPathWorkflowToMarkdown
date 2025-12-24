@@ -110,6 +110,8 @@ DETAIL_ATTRS = (
     "CSharpExpression",
 )
 
+MAX_DETAIL_LENGTH = 180
+
 
 def _extract_logic_detail(element: ElementTree.Element) -> str | None:
     """Extract a concise detail string from common expression-bearing nodes."""
@@ -131,7 +133,9 @@ def _extract_logic_detail(element: ElementTree.Element) -> str | None:
                         content = candidate
                         break
             if content:
-                return content[:180] + ("…" if len(content) > 180 else "")
+                return content[:MAX_DETAIL_LENGTH] + (
+                    "…" if len(content) > MAX_DETAIL_LENGTH else ""
+                )
     return None
 
 
