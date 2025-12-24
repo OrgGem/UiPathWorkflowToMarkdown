@@ -13,6 +13,7 @@ const llmConfig = ref<LLMConfig>({
   enabled: false,
   apiKey: '',
   baseUrl: 'https://api.openai.com/v1',
+  model: 'gpt-4o-mini',
   prompt: 'Analyze this UiPath XAML workflow and provide a concise description of its purpose and key activities.',
 });
 

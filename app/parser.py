@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -29,6 +30,7 @@ class WorkflowData:
     invoked_workflows: List[str]
     key_activities: List[str]
     logic_flow: List[Tuple[int, str]] = field(default_factory=list)
+    raw_xml: str | None = None
 
 
 def get_local_name(tag: str) -> str:
@@ -98,6 +100,45 @@ def _branch_label(name: str) -> str | None:
     return label if label in {"Then", "Else", "Case", "Default"} else None
 
 
+DETAIL_ATTRS = (
+    "Condition",
+    "ExpressionText",
+    "Expression",
+    "Value",
+    "Text",
+    "VBExpression",
+    "CSharpExpression",
+)
+
+MAX_DETAIL_LENGTH = 180
+
+
+def _extract_logic_detail(element: ElementTree.Element) -> str | None:
+    """Extract a concise detail string from common expression-bearing nodes."""
+    for attr in DETAIL_ATTRS:
+        val = element.get(attr)
+        if val and val.strip():
+            return val.strip()
+
+    for child in element:
+        child_name = get_local_name(child.tag).split(".")[-1]
+        if child_name in {"Condition", "Expression", "Value", "Text", "Code", "Statement"}:
+            content = (child.text or "").strip()
+            if not content:
+                for grandchild in child.iter():
+                    if grandchild is child:
+                        continue
+                    candidate = (grandchild.text or "").strip()
+                    if candidate:
+                        content = candidate
+                        break
+            if content:
+                return content[:MAX_DETAIL_LENGTH] + (
+                    "…" if len(content) > MAX_DETAIL_LENGTH else ""
+                )
+    return None
+
+
 def _collect_logic_flow(
     element: ElementTree.Element,
     steps: List[Tuple[int, str]],
@@ -117,6 +158,9 @@ def _collect_logic_flow(
         text = f"{label}{display or tag_name}"
         if display and display != tag_name:
             text = f"{text} [{tag_name}]"
+        detail = _extract_logic_detail(element)
+        if detail:
+            text = f"{text}: {detail}"
         steps.append((depth, text))
         current_depth = depth + 1
 
@@ -134,6 +178,7 @@ def _collect_logic_flow(
 
 def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
     """Parse a single XAML file into workflow data."""
+    raw_xml = xaml_path.read_text(encoding="utf-8", errors="ignore")
     tree = ElementTree.parse(xaml_path)
     root = tree.getroot()
 
@@ -155,6 +200,7 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
         invoked_workflows=invoked_workflows,
         key_activities=key_activities,
         logic_flow=logic_flow,
+        raw_xml=raw_xml,
     )
 
 
@@ -168,11 +214,42 @@ def parse_project(extracted_dir: Path) -> Dict[str, WorkflowData]:
     return workflows
 
 
+def _env_bool(name: str) -> bool | None:
+    """Return a boolean from an environment variable when set."""
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def load_config(config_str: str | None) -> dict:
     """Safely parse optional JSON config string."""
-    if not config_str:
-        return {}
-    try:
-        return json.loads(config_str)
-    except json.JSONDecodeError:
-        return {}
+    if config_str:
+        try:
+            parsed = json.loads(config_str)
+        except json.JSONDecodeError:
+            parsed = {}
+    else:
+        parsed = {}
+
+    env_defaults = {
+        "use_llm": _env_bool("LLM_USE_LLM") or _env_bool("USE_LLM"),
+        "api_key": os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        "base_url": os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL"),
+        "model": os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL"),
+        "format": os.getenv("OUTPUT_FORMAT"),
+        "prompt": os.getenv("LLM_PROMPT"),
+        "use_source": _env_bool("LLM_USE_SOURCE"),
+    }
+
+    config: dict = {}
+    for key, value in env_defaults.items():
+        if value is not None:
+            config[key] = value
+
+    config.update(parsed)
+
+    if config.get("use_llm") and not config.get("base_url"):
+        config["base_url"] = "https://api.openai.com/v1"
+
+    return config

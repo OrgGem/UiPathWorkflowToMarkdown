@@ -8,7 +8,7 @@ A modern Vue 3 + Vite + TypeScript frontend for analyzing UiPath workflows with 
 - **File Management**: View discovered XAML files with path, size, and SHA-256 checksums
 - **LLM Preprocessing**: Optional frontend LLM processing using OpenAI-compatible endpoints
   - API keys stay in the browser (never sent to backend)
-  - Configure custom system prompts
+  - Configure model IDs and custom system prompts
   - Process selected files with chat completions
 - **Backend Integration**: Send raw or LLM-processed files to backend via `/api/workflows/ingest`
 - **Modern UI**: Dark theme with glassy, gradient design inspired by factory.ai

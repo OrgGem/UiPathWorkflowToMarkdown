@@ -49,6 +49,19 @@
 
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">
+          Model ID
+        </label>
+        <input
+          type="text"
+          :value="config.model"
+          @input="updateModel"
+          placeholder="gpt-4o-mini"
+          class="glass-input"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">
           System Prompt
         </label>
         <textarea
@@ -147,6 +160,11 @@ const updatePrompt = (e: Event) => {
   emit('updateConfig', { prompt: target.value });
 };
 
+const updateModel = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  emit('updateConfig', { model: target.value });
+};
+
 const runLLMProcessing = async () => {
   if (!props.config.apiKey) return;
 
@@ -164,7 +182,7 @@ const runLLMProcessing = async () => {
 
     try {
       const request: ChatCompletionRequest = {
-        model: 'gpt-4',
+        model: props.config.model || 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
