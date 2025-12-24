@@ -18,6 +18,7 @@ export interface LLMConfig {
   enabled: boolean;
   apiKey: string;
   baseUrl: string;
+  model: string;
   prompt: string;
 }
 

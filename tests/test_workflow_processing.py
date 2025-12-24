@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.llm import enrich_with_llm
 from app.main import app
 from app.markdown_gen import build_markdown
-from app.parser import WorkflowData, parse_project
+from app.parser import WorkflowData, load_config, parse_project
 
 
 SAMPLE_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
@@ -40,6 +40,27 @@ NESTED_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
           <ui:InvokeWorkflowFile DisplayName=\"Retry Login\" WorkflowFileName=\"Retry.xaml\" />
         </Sequence>
       </If.Else>
+    </If>
+  </Sequence>
+</Activity>
+"""
+
+DETAIL_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<Activity x:Class=\"Detail\" xmlns=\"http://schemas.microsoft.com/netfx/2009/xaml/activities\" xmlns:s=\"clr-namespace:System;assembly=mscorlib\" xmlns:ui=\"http://schemas.uipath.com/workflow/activities\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">
+  <Sequence DisplayName=\"Detail Sequence\">
+    <If DisplayName=\"Check Mode\">
+      <If.Condition>
+        <s:String>mode = \"demo\"</s:String>
+      </If.Condition>
+      <If.Then>
+        <Sequence DisplayName=\"When Demo\">
+          <ui:Assign DisplayName=\"Set Greeting\">
+            <ui:Assign.Value>
+              <s:String>Hello from demo mode</s:String>
+            </ui:Assign.Value>
+          </ui:Assign>
+        </Sequence>
+      </If.Then>
     </If>
   </Sequence>
 </Activity>
@@ -107,3 +128,26 @@ def test_markdown_includes_nested_logic_flow(tmp_path):
     assert "Then: Success Branch [Sequence]" in markdown
     assert "Else: Retry Branch [Sequence]" in markdown
     assert "Retry Login [InvokeWorkflowFile]" in markdown
+
+
+def test_markdown_includes_logic_details(tmp_path):
+    xaml_path = tmp_path / "Detail.xaml"
+    xaml_path.write_text(DETAIL_XAML, encoding="utf-8")
+
+    workflows = parse_project(tmp_path)
+    markdown = build_markdown(workflows)
+
+    assert "mode = \"demo\"" in markdown
+    assert "Hello from demo mode" in markdown
+
+
+def test_load_config_uses_env(monkeypatch):
+    monkeypatch.setenv("LLM_USE_LLM", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_MODEL", "custom-model")
+
+    cfg = load_config(None)
+
+    assert cfg["use_llm"] is True
+    assert cfg["api_key"] == "test-key"
+    assert cfg["model"] == "custom-model"

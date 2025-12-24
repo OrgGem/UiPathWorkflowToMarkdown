@@ -125,6 +125,8 @@ curl -X POST "http://localhost:8000/analyze/upload/" \
 - `api_key` (string): API key for LLM provider (required if use_llm is true)
 - `base_url` (string): Base URL for OpenAI-compatible API (optional)
 - `model` (string): Model to use (default: "gpt-4o-mini")
+- `prompt` (string): Custom system prompt for LLM analysis (optional)
+- `use_source` (boolean): When true, send raw XAML content for richer markdown-style summaries
 - `format` (string): Output format - "list" (default) or "sequence" (Mermaid diagram)
 
 **Example with LLM enrichment:**
@@ -138,6 +140,13 @@ curl -X POST "http://localhost:8000/analyze/upload/" \
   "model": "gpt-4o-mini"
 }
 ```
+
+**Environment variable configuration (optional):**
+- `LLM_USE_LLM=true` to enable backend LLM enrichment without passing config
+- `OPENAI_API_KEY` or `LLM_API_KEY` for authentication
+- `LLM_BASE_URL` / `OPENAI_BASE_URL` and `LLM_MODEL` / `OPENAI_MODEL` to customize endpoints and models
+- `LLM_PROMPT` to override the system prompt
+- `LLM_USE_SOURCE=true` to send raw XAML to the model for markdown-friendly analysis
 
 **Example with Mermaid sequence diagram:**
 
