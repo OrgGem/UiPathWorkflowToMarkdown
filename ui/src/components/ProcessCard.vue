@@ -141,6 +141,14 @@ const sendToBackend = async () => {
     const endpoint = `${baseUrl}/api/workflows/ingest`;
 
     // Prepare the payload
+    let payloadConfig: BackendConfig | undefined = backendConfig.value
+      ? { ...backendConfig.value, use_llm: !!backendConfig.value.use_llm }
+      : undefined;
+
+    if (diagramMode.value) {
+      payloadConfig = { ...(payloadConfig || { use_llm: false }), format: 'sequence' };
+    }
+
     const payload: { files: any[]; config?: BackendConfig } = {
       files: selectedFiles.value.map(file => ({
         path: file.path,
@@ -149,12 +157,8 @@ const sendToBackend = async () => {
         content: sendLLMContent.value && file.llmContent ? file.llmContent : file.content,
         llmProcessed: sendLLMContent.value && file.llmProcessed,
       })),
-      ...(backendConfig.value ? { config: backendConfig.value } : {}),
+      ...(payloadConfig ? { config: payloadConfig } : {}),
     };
-
-    if (diagramMode.value) {
-      payload.config = { ...(payload.config || {}), format: 'sequence' };
-    }
 
     status.value = 'Sending to backend...';
 
@@ -218,9 +222,9 @@ const renderMermaid = async (markdown: string) => {
   const diagram = extractMermaid(markdown);
   if (!diagram) return;
 
-  const mermaid = await import('mermaid');
-  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'dark' });
-  const { svg } = await mermaid.render(`diagram-${Date.now()}`, diagram);
+  const mermaidMod: any = (await import('mermaid')).default || (await import('mermaid'));
+  mermaidMod.initialize?.({ startOnLoad: false, securityLevel: 'loose', theme: 'dark' });
+  const { svg } = await mermaidMod.render(`diagram-${Date.now()}`, diagram);
   mermaidSvg.value = svg;
 };
 </script>

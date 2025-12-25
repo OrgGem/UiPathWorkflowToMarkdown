@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Dict, List, Set
 
 from .parser import WorkflowData
@@ -107,7 +108,13 @@ def build_sequence_markdown(
 
     # Map workflow path to a safe Mermaid participant name
     def pname(path: str) -> str:
-        return Path(path).stem.replace(" ", "_")
+        stem = Path(path).stem
+        safe = re.sub(r"[^A-Za-z0-9_]", "_", stem)
+        if not safe:
+            safe = "workflow"
+        if safe[0].isdigit():
+            safe = f"wf_{safe}"
+        return safe
 
     # Collect all participants
     participants: List[str] = []
