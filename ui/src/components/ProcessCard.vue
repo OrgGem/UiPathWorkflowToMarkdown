@@ -14,17 +14,31 @@
         </div>
       </div>
 
+    <div>
+      <label class="flex items-center gap-3 cursor-pointer mb-2">
+        <input
+          type="checkbox"
+          v-model="sendLLMContent"
+          class="w-5 h-5 rounded border-gray-600 bg-glass text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+        />
+        <span class="text-white font-medium">Send LLM-processed content to backend</span>
+      </label>
+      <p class="text-sm text-gray-400 ml-8">
+        If enabled, sends LLM-processed content instead of raw XAML
+      </p>
+    </div>
+
       <div>
         <label class="flex items-center gap-3 cursor-pointer mb-2">
           <input
             type="checkbox"
-            v-model="sendLLMContent"
+            v-model="diagramMode"
             class="w-5 h-5 rounded border-gray-600 bg-glass text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
           />
-          <span class="text-white font-medium">Send LLM-processed content to backend</span>
+          <span class="text-white font-medium">Render flow diagram (Mermaid)</span>
         </label>
         <p class="text-sm text-gray-400 ml-8">
-          If enabled, sends LLM-processed content instead of raw XAML
+          Requests a sequence diagram and renders it inline.
         </p>
       </div>
 
@@ -50,7 +64,7 @@
         Successfully sent {{ selectedFiles.length }} file(s) to backend
       </div>
 
-      <div v-if="previewContent" class="mt-6">
+      <div v-if="mermaidSvg || previewContent" class="mt-6">
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-medium text-white">Preview</h3>
           <button
@@ -61,7 +75,8 @@
           </button>
         </div>
         <div class="bg-gray-900/50 rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
-          <pre class="text-sm text-gray-300 whitespace-pre-wrap">{{ previewContent }}</pre>
+          <div v-if="mermaidSvg" v-html="mermaidSvg" class="mermaid-diagram"></div>
+          <pre v-else class="text-sm text-gray-300 whitespace-pre-wrap">{{ previewContent }}</pre>
         </div>
       </div>
     </div>
@@ -84,6 +99,8 @@ const error = ref('');
 const success = ref(false);
 const sendLLMContent = ref(false);
 const previewContent = ref('');
+const diagramMode = ref(false);
+const mermaidSvg = ref('');
 
 const selectedFiles = computed(() => {
   return props.files.filter(f => f.selected);
@@ -114,6 +131,7 @@ const sendToBackend = async () => {
   error.value = '';
   success.value = false;
   previewContent.value = '';
+  mermaidSvg.value = '';
   status.value = 'Preparing payload...';
 
   try {
@@ -123,7 +141,7 @@ const sendToBackend = async () => {
     const endpoint = `${baseUrl}/api/workflows/ingest`;
 
     // Prepare the payload
-    const payload = {
+    const payload: { files: any[]; config?: BackendConfig } = {
       files: selectedFiles.value.map(file => ({
         path: file.path,
         size: file.size,
@@ -133,6 +151,10 @@ const sendToBackend = async () => {
       })),
       ...(backendConfig.value ? { config: backendConfig.value } : {}),
     };
+
+    if (diagramMode.value) {
+      payload.config = { ...(payload.config || {}), format: 'sequence' };
+    }
 
     status.value = 'Sending to backend...';
 
@@ -153,6 +175,9 @@ const sendToBackend = async () => {
     const contentType = response.headers.get('content-type');
     if (contentType?.includes('text/markdown') || contentType?.includes('text/plain')) {
       previewContent.value = await response.text();
+      if (diagramMode.value) {
+        await renderMermaid(previewContent.value);
+      }
     } else {
       const data = await response.json();
       previewContent.value = JSON.stringify(data, null, 2);
@@ -178,5 +203,24 @@ const downloadMarkdown = () => {
   link.download = 'workflow-analysis.md';
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const extractMermaid = (markdown: string): string | null => {
+  const fenceStart = markdown.indexOf('```mermaid');
+  if (fenceStart === -1) return null;
+  const afterStart = fenceStart + '```mermaid'.length;
+  const fenceEnd = markdown.indexOf('```', afterStart);
+  if (fenceEnd === -1) return null;
+  return markdown.slice(afterStart, fenceEnd).trim();
+};
+
+const renderMermaid = async (markdown: string) => {
+  const diagram = extractMermaid(markdown);
+  if (!diagram) return;
+
+  const mermaid = await import('mermaid');
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'dark' });
+  const { svg } = await mermaid.render(`diagram-${Date.now()}`, diagram);
+  mermaidSvg.value = svg;
 };
 </script>
