@@ -126,6 +126,11 @@ CONFIG_KEYS = {
 }
 
 
+def _filter_config(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Return only recognized configuration keys."""
+    return {k: v for k, v in data.items() if k in CONFIG_KEYS}
+
+
 def _extract_logic_detail(element: ElementTree.Element) -> str | None:
     """Extract a concise detail string from common expression-bearing nodes."""
     tag_name = get_local_name(element.tag)
@@ -195,22 +200,20 @@ def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
             continue
 
         target = assign.get("To")
-        if target is None or target == "":
-            target = _find_child_text(assign, {"To"})
-        if target is None or target == "":
-            target = "[target]"
+        if not target:
+            target = _find_child_text(assign, {"To"}) or "[target]"
 
         value = assign.get("Value")
         if value is None or value == "":
             value = _find_child_text(assign, {"Value", "Expression", "ExpressionText"})
 
-        if target is not None or value is not None:
-            left = target if target is not None else "[target]"
-            right = value if value is not None else ""
-            statement = f"{left} = {right}".strip()
-            if len(statement) > MAX_DETAIL_LENGTH:
-                statement = statement[:MAX_DETAIL_LENGTH] + "…"
-            assignments.append(statement)
+        if value is None:
+            continue
+
+        statement = f"{target} = {value}".strip()
+        if len(statement) > MAX_DETAIL_LENGTH:
+            statement = statement[:MAX_DETAIL_LENGTH] + "…"
+        assignments.append(statement)
 
     if assignments:
         return "; ".join(assignments)
