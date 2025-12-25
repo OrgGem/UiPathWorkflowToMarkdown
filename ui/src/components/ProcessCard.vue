@@ -65,14 +65,24 @@
       </div>
 
       <div v-if="mermaidSvg || previewContent" class="mt-6">
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <h3 class="font-medium text-white">Preview</h3>
-          <button
-            @click="downloadMarkdown"
-            class="glass-button-secondary px-4 py-2 text-sm"
-          >
-            Download Markdown
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              @click="downloadMarkdown"
+              class="glass-button-secondary px-4 py-2 text-sm"
+            >
+              Download Markdown
+            </button>
+            <button
+              @click="copyMarkdown"
+              :disabled="!previewContent"
+              class="glass-button-secondary px-4 py-2 text-sm"
+              :class="{ 'opacity-50 cursor-not-allowed': !previewContent }"
+            >
+              {{ copyStatus || 'Copy Markdown' }}
+            </button>
+          </div>
         </div>
         <div class="bg-gray-900/50 rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
           <div v-if="mermaidSvg" v-html="mermaidSvg" class="mermaid-diagram"></div>
@@ -101,6 +111,7 @@ const sendLLMContent = ref(false);
 const previewContent = ref('');
 const diagramMode = ref(false);
 const mermaidSvg = ref('');
+const copyStatus = ref('');
 
 const selectedFiles = computed(() => {
   return props.files.filter(f => f.selected);
@@ -207,6 +218,18 @@ const downloadMarkdown = () => {
   link.download = 'workflow-analysis.md';
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const copyMarkdown = async () => {
+  if (!previewContent.value) return;
+  try {
+    await navigator.clipboard.writeText(previewContent.value);
+    copyStatus.value = 'Copied!';
+    setTimeout(() => (copyStatus.value = ''), 1500);
+  } catch (err) {
+    copyStatus.value = 'Copy failed';
+    setTimeout(() => (copyStatus.value = ''), 2000);
+  }
 };
 
 const extractMermaid = (markdown: string): string | null => {
