@@ -197,7 +197,7 @@ def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
         target = assign.get("To")
         if target is None or target == "":
             target = _find_child_text(assign, {"To"})
-        if target == "":
+        if target is None or target == "":
             target = "[target]"
 
         value = assign.get("Value")
