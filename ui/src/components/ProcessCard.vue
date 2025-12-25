@@ -67,7 +67,7 @@
       <div v-if="mermaidSvg || previewContent" class="mt-6">
         <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <h3 class="font-medium text-white">Preview</h3>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <button
               @click="downloadMarkdown"
               class="glass-button-secondary px-4 py-2 text-sm"
@@ -82,10 +82,35 @@
             >
               {{ copyStatus || 'Copy Markdown' }}
             </button>
+            <template v-if="mermaidSvg">
+              <button
+                @click="zoomIn"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Zoom In
+              </button>
+              <button
+                @click="zoomOut"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Zoom Out
+              </button>
+              <button
+                @click="resetZoom"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Reset
+              </button>
+            </template>
           </div>
         </div>
         <div class="bg-gray-900/50 rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
-          <div v-if="mermaidSvg" v-html="mermaidSvg" class="mermaid-diagram"></div>
+          <div
+            v-if="mermaidSvg"
+            v-html="mermaidSvg"
+            class="mermaid-diagram"
+            :style="{ transform: `scale(${zoom})`, transformOrigin: 'top left' }"
+          ></div>
           <pre v-else class="text-sm text-gray-300 whitespace-pre-wrap">{{ previewContent }}</pre>
         </div>
       </div>
@@ -112,6 +137,7 @@ const previewContent = ref('');
 const diagramMode = ref(false);
 const mermaidSvg = ref('');
 const copyStatus = ref('');
+const zoom = ref(1);
 
 const selectedFiles = computed(() => {
   return props.files.filter(f => f.selected);
@@ -230,6 +256,18 @@ const copyMarkdown = async () => {
     copyStatus.value = 'Copy failed';
     setTimeout(() => (copyStatus.value = ''), 2000);
   }
+};
+
+const zoomIn = () => {
+  zoom.value = Math.min(zoom.value + 0.1, 3);
+};
+
+const zoomOut = () => {
+  zoom.value = Math.max(zoom.value - 0.1, 0.5);
+};
+
+const resetZoom = () => {
+  zoom.value = 1;
 };
 
 const extractMermaid = (markdown: string): string | null => {
