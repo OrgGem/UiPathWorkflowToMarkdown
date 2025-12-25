@@ -155,6 +155,9 @@ def test_markdown_includes_nested_logic_flow(tmp_path):
     assert "Then: Success Branch [Sequence]" in markdown
     assert "Else: Retry Branch [Sequence]" in markdown
     assert "Retry Login [InvokeWorkflowFile]" in markdown
+    assert "Components:" in markdown
+    assert "Login Flow [Sequence]" in markdown
+    assert "Check Login Success [If]" in markdown
 
 
 def test_markdown_includes_logic_details(tmp_path):

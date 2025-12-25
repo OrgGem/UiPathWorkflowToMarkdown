@@ -31,6 +31,7 @@ class WorkflowData:
     invoked_workflows: List[str]
     key_activities: List[str]
     logic_flow: List[Tuple[int, str]] = field(default_factory=list)
+    components: List[str] = field(default_factory=list)
     raw_xml: str | None = None
 
 
@@ -60,6 +61,21 @@ def _collect_key_activities(element: ElementTree.Element, activities: List[str])
         activities.append(element.get("DisplayName") or name)
     for child in element:
         _collect_key_activities(child, activities)
+
+
+def _collect_components(element: ElementTree.Element, components: List[str]) -> None:
+    """Recursively collect activity/component display names."""
+    name = get_local_name(element.tag)
+    display = element.get("DisplayName")
+    if display or name:
+        label = display or name
+        if display and display != name:
+            label = f"{label} [{name}]"
+        elif not display:
+            label = name
+        components.append(label)
+    for child in element:
+        _collect_components(child, components)
 
 
 def _find_invoked_workflows(element: ElementTree.Element, workflows: List[str]) -> None:
@@ -279,9 +295,11 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
     invoked_workflows: List[str] = []
     key_activities: List[str] = []
     logic_flow: List[Tuple[int, str]] = []
+    components: List[str] = []
 
     _find_invoked_workflows(root, invoked_workflows)
     _collect_key_activities(root, key_activities)
+    _collect_components(root, components)
     for child in root:
         _collect_logic_flow(child, logic_flow)
 
@@ -294,6 +312,7 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
         invoked_workflows=invoked_workflows,
         key_activities=key_activities,
         logic_flow=logic_flow,
+        components=components,
         raw_xml=raw_xml,
     )
 

@@ -45,6 +45,11 @@ def generate_markdown(
         for depth, step in workflow_data.logic_flow:
             lines.append(f"{prefix}{INDENT * (depth + 2)}- {step}")
 
+    if workflow_data and workflow_data.components:
+        lines.append(f"{prefix}{INDENT}- Components:")
+        for comp in workflow_data.components:
+            lines.append(f"{prefix}{INDENT * 3}- {comp}")
+
     if workflow_data and workflow_data.invoked_workflows:
         lines.append(f"{prefix}{INDENT}- Invokes:")
         for child in workflow_data.invoked_workflows:
