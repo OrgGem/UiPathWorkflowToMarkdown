@@ -306,7 +306,7 @@ def _env_bool(name: str) -> bool | None:
 def load_config(config_input: str | Dict[str, Any] | None) -> dict:
     """Safely parse optional JSON config string or dict."""
     if isinstance(config_input, dict):
-        parsed = {k: v for k, v in config_input.items() if k in CONFIG_KEYS}
+        parsed = dict(config_input)
     elif config_input:
         try:
             parsed = json.loads(config_input)
@@ -315,10 +315,7 @@ def load_config(config_input: str | Dict[str, Any] | None) -> dict:
     else:
         parsed = {}
 
-    if isinstance(parsed, dict):
-        parsed = {k: v for k, v in parsed.items() if k in CONFIG_KEYS}
-    else:
-        parsed = {}
+    parsed = _filter_config(parsed) if isinstance(parsed, dict) else {}
 
     env_defaults = {
         "use_llm": _env_bool("LLM_USE_LLM") or _env_bool("USE_LLM"),
