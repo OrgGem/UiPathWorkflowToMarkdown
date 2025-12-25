@@ -177,43 +177,56 @@ def _first_text(element: ElementTree.Element) -> str | None:
 
 
 def _find_child_text(
-    element: ElementTree.Element, target_names: set[str]
+    element: ElementTree.Element, target_names: set[str], max_depth: int = 3
 ) -> str | None:
-    """Find the first text content from matching child names."""
-    for child in element.iter():
-        child_name = get_local_name(child.tag).split(".")[-1]
+    """Find the first text content from matching child names up to a depth."""
+    stack: List[Tuple[ElementTree.Element, int]] = [(child, 1) for child in element]
+    while stack:
+        current, depth = stack.pop()
+        child_name = get_local_name(current.tag).split(".")[-1]
         if child_name in target_names:
-            text = _first_text(child)
+            text = _first_text(current)
             if text:
                 return text
+        if depth < max_depth:
+            for child in current:
+                stack.append((child, depth + 1))
     return None
 
 
 def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
     """Collect assignment pairs within a MultipleAssign activity."""
     assignments: List[str] = []
-    for assign in element.iter():
-        if assign is element:
-            continue
-        assign_name = get_local_name(assign.tag).split(".")[-1]
-        if assign_name != "Assign":
-            continue
 
-        target = assign.get("To")
-        if not target:
-            target = _find_child_text(assign, {"To"}) or "[target]"
+    def _walk(node: ElementTree.Element, is_root: bool = False) -> None:
+        node_name = get_local_name(node.tag).split(".")[-1]
+        if not is_root and node_name == "MultipleAssign":
+            return
 
-        value = assign.get("Value")
-        if value is None or value == "":
-            value = _find_child_text(assign, {"Value", "Expression", "ExpressionText"})
+        if node_name == "Assign":
+            target = node.get("To")
+            if not target:
+                target = _find_child_text(node, {"To"}) or "[target]"
 
-        if value is None:
-            continue
+            value = node.get("Value")
+            if not value:
+                value = _find_child_text(
+                    node, {"Value", "Expression", "ExpressionText"}
+                )
 
-        statement = f"{target} = {value}".strip()
-        if len(statement) > MAX_DETAIL_LENGTH:
-            statement = statement[:MAX_DETAIL_LENGTH] + "…"
-        assignments.append(statement)
+            if value is None:
+                return
+
+            statement = f"{target} = {value}".strip()
+            if len(statement) > MAX_DETAIL_LENGTH:
+                statement = statement[:MAX_DETAIL_LENGTH] + "…"
+            assignments.append(statement)
+            return
+
+        for child in node:
+            _walk(child)
+
+    _walk(element, is_root=True)
 
     if assignments:
         return "; ".join(assignments)
