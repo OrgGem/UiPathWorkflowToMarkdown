@@ -104,7 +104,6 @@ const backendConfig = computed<BackendConfig | undefined>(() => {
     base_url: props.llmConfig.baseUrl,
     model: props.llmConfig.model,
     prompt: props.llmConfig.prompt,
-    use_source: true,
   };
 });
 

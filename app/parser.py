@@ -114,6 +114,17 @@ DETAIL_ATTRS = (
 
 MAX_DETAIL_LENGTH = 180
 
+CONFIG_KEYS = {
+    "use_llm",
+    "llm_provider",
+    "api_key",
+    "base_url",
+    "model",
+    "format",
+    "prompt",
+    "use_source",
+}
+
 
 def _extract_logic_detail(element: ElementTree.Element) -> str | None:
     """Extract a concise detail string from common expression-bearing nodes."""
@@ -183,12 +194,20 @@ def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
         if assign_name != "Assign":
             continue
 
-        target = assign.get("To") or _find_child_text(assign, {"To"})
-        value = assign.get("Value") or _find_child_text(
-            assign, {"Value", "Expression", "ExpressionText"}
-        )
-        if target or value:
-            statement = f"{target or '[target]'} = {value or ''}".strip()
+        target = assign.get("To")
+        if target is None or target == "":
+            target = _find_child_text(assign, {"To"})
+        if target == "":
+            target = "[target]"
+
+        value = assign.get("Value")
+        if value is None or value == "":
+            value = _find_child_text(assign, {"Value", "Expression", "ExpressionText"})
+
+        if target is not None or value is not None:
+            left = target if target is not None else "[target]"
+            right = value if value is not None else ""
+            statement = f"{left} = {right}".strip()
             if len(statement) > MAX_DETAIL_LENGTH:
                 statement = statement[:MAX_DETAIL_LENGTH] + "…"
             assignments.append(statement)
@@ -284,12 +303,17 @@ def _env_bool(name: str) -> bool | None:
 def load_config(config_input: str | Dict[str, Any] | None) -> dict:
     """Safely parse optional JSON config string or dict."""
     if isinstance(config_input, dict):
-        parsed = dict(config_input)
+        parsed = {k: v for k, v in config_input.items() if k in CONFIG_KEYS}
     elif config_input:
         try:
             parsed = json.loads(config_input)
         except json.JSONDecodeError:
             parsed = {}
+    else:
+        parsed = {}
+
+    if isinstance(parsed, dict):
+        parsed = {k: v for k, v in parsed.items() if k in CONFIG_KEYS}
     else:
         parsed = {}
 
