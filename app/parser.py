@@ -63,17 +63,33 @@ def _collect_key_activities(element: ElementTree.Element, activities: List[str])
         _collect_key_activities(child, activities)
 
 
+SKIP_COMPONENT_NAMES = {
+    "Activity",
+    "TextExpression.NamespacesForImplementation",
+    "NamespacesForImplementation",
+    "Collection",
+    "Array",
+    "String",
+}
+
+
 def _collect_components(element: ElementTree.Element, components: List[str]) -> None:
     """Recursively collect activity/component display names."""
     name = get_local_name(element.tag)
     display = element.get("DisplayName")
-    if display or name:
+
+    should_include = False
+    if display:
+        should_include = True
+    elif name not in SKIP_COMPONENT_NAMES and name in LOGIC_ACTIVITY_NAMES:
+        should_include = True
+
+    if should_include:
         label = display or name
         if display and display != name:
             label = f"{label} [{name}]"
-        elif not display:
-            label = name
         components.append(label)
+
     for child in element:
         _collect_components(child, components)
 

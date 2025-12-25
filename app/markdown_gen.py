@@ -152,7 +152,7 @@ def build_sequence_markdown(
                         + "\\n".join(note_lines).replace("\n", " ")
                     )
             walk(callee_path)
-            lines.append(f"{pname(caller_path)}<<- {pname(callee_path)}: Return")
+            lines.append(f"{pname(caller_path)} <<- {pname(callee_path)}: Return")
 
     for root in sorted(roots):
         walk(root)

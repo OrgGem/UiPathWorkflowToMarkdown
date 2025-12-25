@@ -171,6 +171,32 @@ def test_markdown_includes_logic_details(tmp_path):
     assert "Hello from demo mode" in markdown
 
 
+def test_components_skip_types(tmp_path):
+    xaml = """<?xml version="1.0" encoding="utf-8"?>
+<Activity x:Class="Types" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="Root Seq">
+    <ui:Assign DisplayName="Set Var" />
+    <ui:If DisplayName="Check Something" />
+    <String />
+    <Collection />
+    <TextExpression.NamespacesForImplementation />
+  </Sequence>
+</Activity>
+"""
+    xaml_path = tmp_path / "Types.xaml"
+    xaml_path.write_text(xaml, encoding="utf-8")
+
+    workflows = parse_project(tmp_path)
+    markdown = build_markdown(workflows)
+
+    assert "Components:" in markdown
+    assert "Set Var [Assign]" in markdown
+    assert "Check Something [If]" in markdown
+    assert "String" not in markdown
+    assert "Collection" not in markdown
+    assert "TextExpression.NamespacesForImplementation" not in markdown
+
+
 def test_multiple_assign_details_included(tmp_path):
     xaml_path = tmp_path / "Multi.xaml"
     xaml_path.write_text(MULTIPLE_ASSIGN_XAML, encoding="utf-8")
