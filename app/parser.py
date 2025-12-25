@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
@@ -15,6 +15,7 @@ KEY_ACTIVITY_NAMES = {
     "If",
     "ForEach",
     "Assign",
+    "MultipleAssign",
     "While",
     "DoWhile",
     "Sequence",
@@ -91,6 +92,7 @@ LOGIC_ACTIVITY_NAMES = KEY_ACTIVITY_NAMES | {
     "StateMachine",
     "Flowchart",
     "FlowStep",
+    "MultipleAssign",
 }
 
 
@@ -115,6 +117,13 @@ MAX_DETAIL_LENGTH = 180
 
 def _extract_logic_detail(element: ElementTree.Element) -> str | None:
     """Extract a concise detail string from common expression-bearing nodes."""
+    tag_name = get_local_name(element.tag)
+
+    if tag_name == "MultipleAssign":
+        detail = _extract_multiple_assign_detail(element)
+        if detail:
+            return detail
+
     for attr in DETAIL_ATTRS:
         val = element.get(attr)
         if val and val.strip():
@@ -136,6 +145,56 @@ def _extract_logic_detail(element: ElementTree.Element) -> str | None:
                 return content[:MAX_DETAIL_LENGTH] + (
                     "…" if len(content) > MAX_DETAIL_LENGTH else ""
                 )
+    return None
+
+
+def _first_text(element: ElementTree.Element) -> str | None:
+    """Return the first meaningful text within an element or its descendants."""
+    if element.text and element.text.strip():
+        return element.text.strip()
+    for child in element.iter():
+        if child is element:
+            continue
+        if child.text and child.text.strip():
+            return child.text.strip()
+    return None
+
+
+def _find_child_text(
+    element: ElementTree.Element, target_names: set[str]
+) -> str | None:
+    """Find the first text content from matching child names."""
+    for child in element.iter():
+        child_name = get_local_name(child.tag).split(".")[-1]
+        if child_name in target_names:
+            text = _first_text(child)
+            if text:
+                return text
+    return None
+
+
+def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
+    """Collect assignment pairs within a MultipleAssign activity."""
+    assignments: List[str] = []
+    for assign in element.iter():
+        if assign is element:
+            continue
+        assign_name = get_local_name(assign.tag).split(".")[-1]
+        if assign_name != "Assign":
+            continue
+
+        target = assign.get("To") or _find_child_text(assign, {"To"})
+        value = assign.get("Value") or _find_child_text(
+            assign, {"Value", "Expression", "ExpressionText"}
+        )
+        if target or value:
+            statement = f"{target or '[target]'} = {value or ''}".strip()
+            if len(statement) > MAX_DETAIL_LENGTH:
+                statement = statement[:MAX_DETAIL_LENGTH] + "…"
+            assignments.append(statement)
+
+    if assignments:
+        return "; ".join(assignments)
     return None
 
 
@@ -222,11 +281,13 @@ def _env_bool(name: str) -> bool | None:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def load_config(config_str: str | None) -> dict:
-    """Safely parse optional JSON config string."""
-    if config_str:
+def load_config(config_input: str | Dict[str, Any] | None) -> dict:
+    """Safely parse optional JSON config string or dict."""
+    if isinstance(config_input, dict):
+        parsed = dict(config_input)
+    elif config_input:
         try:
-            parsed = json.loads(config_str)
+            parsed = json.loads(config_input)
         except json.JSONDecodeError:
             parsed = {}
     else:

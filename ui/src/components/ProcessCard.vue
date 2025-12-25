@@ -70,11 +70,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { XamlFile } from '../types';
+import type { BackendConfig, LLMConfig, XamlFile } from '../types';
 
 const props = defineProps<{
   files: XamlFile[];
   apiUrl?: string;
+  llmConfig?: LLMConfig;
 }>();
 
 const processing = ref(false);
@@ -90,6 +91,21 @@ const selectedFiles = computed(() => {
 
 const llmProcessedCount = computed(() => {
   return props.files.filter(f => f.llmProcessed).length;
+});
+
+const backendConfig = computed<BackendConfig | undefined>(() => {
+  if (!props.llmConfig || !props.llmConfig.enabled || !props.llmConfig.apiKey) {
+    return undefined;
+  }
+
+  return {
+    use_llm: true,
+    api_key: props.llmConfig.apiKey,
+    base_url: props.llmConfig.baseUrl,
+    model: props.llmConfig.model,
+    prompt: props.llmConfig.prompt,
+    use_source: true,
+  };
 });
 
 const sendToBackend = async () => {
@@ -116,6 +132,7 @@ const sendToBackend = async () => {
         content: sendLLMContent.value && file.llmContent ? file.llmContent : file.content,
         llmProcessed: sendLLMContent.value && file.llmProcessed,
       })),
+      ...(backendConfig.value ? { config: backendConfig.value } : {}),
     };
 
     status.value = 'Sending to backend...';

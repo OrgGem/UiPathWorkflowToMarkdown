@@ -71,7 +71,7 @@ const closeFileViewer = () => {
             @update="handleFilesUpdate"
             @view-file="handleViewFile"
           />
-          <ProcessCard :files="files" />
+          <ProcessCard :files="files" :llm-config="llmConfig" />
         </div>
       </div>
 
