@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Dict, List, Set
 
 from .parser import WorkflowData
@@ -44,6 +45,11 @@ def generate_markdown(
         lines.append(f"{prefix}{INDENT}- Logic flow:")
         for depth, step in workflow_data.logic_flow:
             lines.append(f"{prefix}{INDENT * (depth + 2)}- {step}")
+
+    if workflow_data and workflow_data.components:
+        lines.append(f"{prefix}{INDENT}- Components:")
+        for comp in workflow_data.components:
+            lines.append(f"{prefix}{INDENT * 3}- {comp}")
 
     if workflow_data and workflow_data.invoked_workflows:
         lines.append(f"{prefix}{INDENT}- Invokes:")
@@ -102,7 +108,13 @@ def build_sequence_markdown(
 
     # Map workflow path to a safe Mermaid participant name
     def pname(path: str) -> str:
-        return Path(path).stem.replace(" ", "_")
+        stem = Path(path).stem
+        safe = re.sub(r"[^A-Za-z0-9_]", "_", stem)
+        if not safe:
+            safe = "workflow"
+        if safe[0].isdigit():
+            safe = f"wf_{safe}"
+        return safe
 
     # Collect all participants
     participants: List[str] = []
@@ -140,7 +152,7 @@ def build_sequence_markdown(
                         + "\\n".join(note_lines).replace("\n", " ")
                     )
             walk(callee_path)
-            lines.append(f"{pname(caller_path)}<<- {pname(callee_path)}: Return")
+            lines.append(f"{pname(callee_path)} -->> {pname(caller_path)}: Return")
 
     for root in sorted(roots):
         walk(root)

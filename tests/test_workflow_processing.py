@@ -66,6 +66,33 @@ DETAIL_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
 </Activity>
 """
 
+MULTIPLE_ASSIGN_XAML = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<Activity x:Class=\"Multi\" xmlns=\"http://schemas.microsoft.com/netfx/2009/xaml/activities\" xmlns:ui=\"http://schemas.uipath.com/workflow/activities\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">
+  <Sequence DisplayName=\"Root\">
+    <ui:MultipleAssign DisplayName=\"Multiple Assign\">
+      <ui:MultipleAssign.Assignments>
+        <ui:Assign x:TypeArguments=\"x:String\" DisplayName=\"Set Greeting\">
+          <ui:Assign.To>
+            <OutArgument x:TypeArguments=\"x:String\">[greeting]</OutArgument>
+          </ui:Assign.To>
+          <ui:Assign.Value>
+            <InArgument x:TypeArguments=\"x:String\">\"Hello\"</InArgument>
+          </ui:Assign.Value>
+        </ui:Assign>
+        <ui:Assign x:TypeArguments=\"x:Int32\" DisplayName=\"Set Count\">
+          <ui:Assign.To>
+            <OutArgument x:TypeArguments=\"x:Int32\">[count]</OutArgument>
+          </ui:Assign.To>
+          <ui:Assign.Value>
+            <InArgument x:TypeArguments=\"x:Int32\">5</InArgument>
+          </ui:Assign.Value>
+        </ui:Assign>
+      </ui:MultipleAssign.Assignments>
+    </ui:MultipleAssign>
+  </Sequence>
+</Activity>
+"""
+
 
 def _build_zip() -> BytesIO:
     buf = BytesIO()
@@ -128,6 +155,9 @@ def test_markdown_includes_nested_logic_flow(tmp_path):
     assert "Then: Success Branch [Sequence]" in markdown
     assert "Else: Retry Branch [Sequence]" in markdown
     assert "Retry Login [InvokeWorkflowFile]" in markdown
+    assert "Components:" in markdown
+    assert "Login Flow [Sequence]" in markdown
+    assert "Check Login Success [If]" in markdown
 
 
 def test_markdown_includes_logic_details(tmp_path):
@@ -141,6 +171,44 @@ def test_markdown_includes_logic_details(tmp_path):
     assert "Hello from demo mode" in markdown
 
 
+def test_components_skip_types(tmp_path):
+    xaml = """<?xml version="1.0" encoding="utf-8"?>
+<Activity x:Class="Types" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:ui="http://schemas.uipath.com/workflow/activities" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence DisplayName="Root Seq">
+    <ui:Assign DisplayName="Set Var" />
+    <ui:If DisplayName="Check Something" />
+    <String />
+    <Collection />
+    <TextExpression.NamespacesForImplementation />
+  </Sequence>
+</Activity>
+"""
+    xaml_path = tmp_path / "Types.xaml"
+    xaml_path.write_text(xaml, encoding="utf-8")
+
+    workflows = parse_project(tmp_path)
+    markdown = build_markdown(workflows)
+
+    assert "Components:" in markdown
+    assert "Set Var [Assign]" in markdown
+    assert "Check Something [If]" in markdown
+    assert "String" not in markdown
+    assert "Collection" not in markdown
+    assert "TextExpression.NamespacesForImplementation" not in markdown
+
+
+def test_multiple_assign_details_included(tmp_path):
+    xaml_path = tmp_path / "Multi.xaml"
+    xaml_path.write_text(MULTIPLE_ASSIGN_XAML, encoding="utf-8")
+
+    workflows = parse_project(tmp_path)
+    markdown = build_markdown(workflows)
+
+    assert "Multiple Assign" in markdown
+    assert "greeting" in markdown
+    assert "count" in markdown
+
+
 def test_load_config_uses_env(monkeypatch):
     monkeypatch.setenv("LLM_USE_LLM", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -151,3 +219,41 @@ def test_load_config_uses_env(monkeypatch):
     assert cfg["use_llm"] is True
     assert cfg["api_key"] == "test-key"
     assert cfg["model"] == "custom-model"
+
+
+def test_ingest_endpoint_supports_llm_config(monkeypatch):
+    client = TestClient(app)
+
+    captured = {}
+
+    def fake_enrich(workflows, cfg):
+        captured["cfg"] = cfg
+        first_key = next(iter(workflows))
+        return {first_key: "LLM detail"}
+
+    monkeypatch.setattr("app.main.enrich_with_llm", fake_enrich)
+
+    payload = {
+        "files": [
+            {
+                "path": "Main.xaml",
+                "size": len(SAMPLE_XAML),
+                "checksum": "abc123",
+                "content": SAMPLE_XAML,
+                "llmProcessed": False,
+            }
+        ],
+        "config": {
+            "use_llm": True,
+            "api_key": "sk-test",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o-mini",
+            "prompt": "Summarize",
+        },
+    }
+
+    response = client.post("/api/workflows/ingest", json=payload)
+    assert response.status_code == 200
+    assert "LLM detail" in response.text
+    assert captured["cfg"]["use_llm"] is True
+    assert captured["cfg"]["api_key"] == "sk-test"

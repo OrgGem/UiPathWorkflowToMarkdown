@@ -14,17 +14,31 @@
         </div>
       </div>
 
+    <div>
+      <label class="flex items-center gap-3 cursor-pointer mb-2">
+        <input
+          type="checkbox"
+          v-model="sendLLMContent"
+          class="w-5 h-5 rounded border-gray-600 bg-glass text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+        />
+        <span class="text-white font-medium">Send LLM-processed content to backend</span>
+      </label>
+      <p class="text-sm text-gray-400 ml-8">
+        If enabled, sends LLM-processed content instead of raw XAML
+      </p>
+    </div>
+
       <div>
         <label class="flex items-center gap-3 cursor-pointer mb-2">
           <input
             type="checkbox"
-            v-model="sendLLMContent"
+            v-model="diagramMode"
             class="w-5 h-5 rounded border-gray-600 bg-glass text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
           />
-          <span class="text-white font-medium">Send LLM-processed content to backend</span>
+          <span class="text-white font-medium">Render flow diagram (Mermaid)</span>
         </label>
         <p class="text-sm text-gray-400 ml-8">
-          If enabled, sends LLM-processed content instead of raw XAML
+          Requests a sequence diagram and renders it inline.
         </p>
       </div>
 
@@ -50,19 +64,105 @@
         Successfully sent {{ selectedFiles.length }} file(s) to backend
       </div>
 
-      <div v-if="previewContent" class="mt-6">
-        <div class="flex items-center justify-between mb-2">
+      <div v-if="mermaidSvg || previewContent" class="mt-6">
+        <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <h3 class="font-medium text-white">Preview</h3>
-          <button
-            @click="downloadMarkdown"
-            class="glass-button-secondary px-4 py-2 text-sm"
-          >
-            Download Markdown
-          </button>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button
+              @click="downloadMarkdown"
+              class="glass-button-secondary px-4 py-2 text-sm"
+            >
+              Download Markdown
+            </button>
+            <button
+              @click="copyMarkdown"
+              :disabled="!previewContent"
+              class="glass-button-secondary px-4 py-2 text-sm"
+              :class="{ 'opacity-50 cursor-not-allowed': !previewContent }"
+            >
+              {{ copyStatus || 'Copy Markdown' }}
+            </button>
+            <template v-if="mermaidSvg">
+              <button
+                @click="zoomIn"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Zoom In
+              </button>
+              <button
+                @click="zoomOut"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Zoom Out
+              </button>
+              <button
+                @click="resetZoom"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Reset
+              </button>
+              <button
+                @click="openFullscreen"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Fullscreen
+              </button>
+              <button
+                @click="openFullscreen"
+                class="glass-button-secondary px-3 py-2 text-sm"
+              >
+                Fullscreen
+              </button>
+            </template>
+          </div>
         </div>
         <div class="bg-gray-900/50 rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
-          <pre class="text-sm text-gray-300 whitespace-pre-wrap">{{ previewContent }}</pre>
+          <div
+            v-if="mermaidSvg"
+            v-html="mermaidSvg"
+            class="mermaid-diagram"
+            :style="{ transform: `scale(${zoom})`, transformOrigin: 'top left' }"
+          ></div>
+          <pre v-else class="text-sm text-gray-300 whitespace-pre-wrap">{{ previewContent }}</pre>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="showDiagramModal"
+    class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+    @click="closeFullscreen"
+  >
+    <div
+      class="bg-gray-900/80 rounded-lg p-4 border border-white/20 max-h-[90vh] max-w-[90vw] w-full"
+      @click.stop
+    >
+      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <h3 class="text-white font-semibold">Diagram</h3>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button @click="modalZoomIn" class="glass-button-secondary px-3 py-2 text-sm">
+            Zoom In
+          </button>
+          <button @click="modalZoomOut" class="glass-button-secondary px-3 py-2 text-sm">
+            Zoom Out
+          </button>
+          <button @click="modalResetZoom" class="glass-button-secondary px-3 py-2 text-sm">
+            Reset
+          </button>
+          <button @click="closeFullscreen" class="glass-button-secondary px-3 py-2 text-sm">
+            Close
+          </button>
+        </div>
+      </div>
+      <div class="bg-gray-900 rounded-lg p-4 border border-white/10 max-h-[75vh] overflow-auto">
+        <div
+          v-if="mermaidSvg"
+          v-html="mermaidSvg"
+          class="mermaid-diagram"
+          :style="{ transform: `scale(${modalZoom})`, transformOrigin: 'top left' }"
+        ></div>
+        <p v-else class="text-gray-300 text-sm">No diagram available.</p>
       </div>
     </div>
   </div>
@@ -70,11 +170,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { XamlFile } from '../types';
+import type { BackendConfig, LLMConfig, XamlFile } from '../types';
 
 const props = defineProps<{
   files: XamlFile[];
   apiUrl?: string;
+  llmConfig?: LLMConfig;
 }>();
 
 const processing = ref(false);
@@ -83,6 +184,12 @@ const error = ref('');
 const success = ref(false);
 const sendLLMContent = ref(false);
 const previewContent = ref('');
+const diagramMode = ref(false);
+const mermaidSvg = ref('');
+const copyStatus = ref('');
+const zoom = ref(1);
+const showDiagramModal = ref(false);
+const modalZoom = ref(1);
 
 const selectedFiles = computed(() => {
   return props.files.filter(f => f.selected);
@@ -92,6 +199,20 @@ const llmProcessedCount = computed(() => {
   return props.files.filter(f => f.llmProcessed).length;
 });
 
+const backendConfig = computed<BackendConfig | undefined>(() => {
+  if (!props.llmConfig || !props.llmConfig.enabled || !props.llmConfig.apiKey) {
+    return undefined;
+  }
+
+  return {
+    use_llm: true,
+    api_key: props.llmConfig.apiKey,
+    base_url: props.llmConfig.baseUrl,
+    model: props.llmConfig.model,
+    prompt: props.llmConfig.prompt,
+  };
+});
+
 const sendToBackend = async () => {
   if (selectedFiles.value.length === 0) return;
 
@@ -99,6 +220,7 @@ const sendToBackend = async () => {
   error.value = '';
   success.value = false;
   previewContent.value = '';
+  mermaidSvg.value = '';
   status.value = 'Preparing payload...';
 
   try {
@@ -108,7 +230,15 @@ const sendToBackend = async () => {
     const endpoint = `${baseUrl}/api/workflows/ingest`;
 
     // Prepare the payload
-    const payload = {
+    let payloadConfig: BackendConfig | undefined = backendConfig.value
+      ? { ...backendConfig.value, use_llm: !!backendConfig.value.use_llm }
+      : undefined;
+
+    if (diagramMode.value) {
+      payloadConfig = { ...(payloadConfig || { use_llm: false }), format: 'sequence' };
+    }
+
+    const payload: { files: any[]; config?: BackendConfig } = {
       files: selectedFiles.value.map(file => ({
         path: file.path,
         size: file.size,
@@ -116,6 +246,7 @@ const sendToBackend = async () => {
         content: sendLLMContent.value && file.llmContent ? file.llmContent : file.content,
         llmProcessed: sendLLMContent.value && file.llmProcessed,
       })),
+      ...(payloadConfig ? { config: payloadConfig } : {}),
     };
 
     status.value = 'Sending to backend...';
@@ -137,6 +268,9 @@ const sendToBackend = async () => {
     const contentType = response.headers.get('content-type');
     if (contentType?.includes('text/markdown') || contentType?.includes('text/plain')) {
       previewContent.value = await response.text();
+      if (diagramMode.value) {
+        await renderMermaid(previewContent.value);
+      }
     } else {
       const data = await response.json();
       previewContent.value = JSON.stringify(data, null, 2);
@@ -162,5 +296,69 @@ const downloadMarkdown = () => {
   link.download = 'workflow-analysis.md';
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const copyMarkdown = async () => {
+  if (!previewContent.value) return;
+  try {
+    await navigator.clipboard.writeText(previewContent.value);
+    copyStatus.value = 'Copied!';
+    setTimeout(() => (copyStatus.value = ''), 1500);
+  } catch (err) {
+    copyStatus.value = 'Copy failed';
+    setTimeout(() => (copyStatus.value = ''), 2000);
+  }
+};
+
+const zoomIn = () => {
+  zoom.value = Math.min(zoom.value + 0.1, 3);
+};
+
+const zoomOut = () => {
+  zoom.value = Math.max(zoom.value - 0.1, 0.5);
+};
+
+const resetZoom = () => {
+  zoom.value = 1;
+};
+
+const openFullscreen = () => {
+  modalZoom.value = zoom.value;
+  showDiagramModal.value = true;
+};
+
+const closeFullscreen = () => {
+  showDiagramModal.value = false;
+};
+
+const modalZoomIn = () => {
+  modalZoom.value = Math.min(modalZoom.value + 0.1, 3);
+};
+
+const modalZoomOut = () => {
+  modalZoom.value = Math.max(modalZoom.value - 0.1, 0.5);
+};
+
+const modalResetZoom = () => {
+  modalZoom.value = 1;
+};
+
+const extractMermaid = (markdown: string): string | null => {
+  const fenceStart = markdown.indexOf('```mermaid');
+  if (fenceStart === -1) return null;
+  const afterStart = fenceStart + '```mermaid'.length;
+  const fenceEnd = markdown.indexOf('```', afterStart);
+  if (fenceEnd === -1) return null;
+  return markdown.slice(afterStart, fenceEnd).trim();
+};
+
+const renderMermaid = async (markdown: string) => {
+  const diagram = extractMermaid(markdown);
+  if (!diagram) return;
+
+  const mermaidMod: any = (await import('mermaid')).default || (await import('mermaid'));
+  mermaidMod.initialize?.({ startOnLoad: false, securityLevel: 'loose', theme: 'dark' });
+  const { svg } = await mermaidMod.render(`diagram-${Date.now()}`, diagram);
+  mermaidSvg.value = svg;
 };
 </script>

@@ -30,6 +30,10 @@ export interface BackendConfig {
   llm_provider?: string;
   api_key?: string;
   base_url?: string;
+  model?: string;
+  prompt?: string;
+  use_source?: boolean;
+  format?: string;
 }
 
 /**

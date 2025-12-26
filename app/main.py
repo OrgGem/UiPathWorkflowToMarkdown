@@ -72,6 +72,7 @@ class IngestFilePayload(BaseModel):
 class IngestRequest(BaseModel):
     """Request payload for the /api/workflows/ingest endpoint"""
     files: List[IngestFilePayload]
+    config: Optional[Dict[str, Any]] = None
 
 
 @app.post("/api/workflows/ingest", response_class=PlainTextResponse)
@@ -101,8 +102,13 @@ async def ingest_workflows(request: IngestRequest = Body(...)):
         if not workflows:
             raise HTTPException(status_code=400, detail="No valid XAML workflows found")
 
-        # Generate markdown (no additional LLM enrichment as files may already be processed)
-        markdown = build_markdown(workflows, None)
+        cfg = load_config(request.config)
+        llm_descriptions = enrich_with_llm(workflows, cfg)
+        output_format = (cfg or {}).get("format")
+        if output_format == "sequence":
+            markdown = build_sequence_markdown(workflows, llm_descriptions or None)
+        else:
+            markdown = build_markdown(workflows, llm_descriptions or None)
         headers = {"Content-Disposition": 'attachment; filename="analysis.md"'}
         return PlainTextResponse(markdown, media_type="text/markdown", headers=headers)
 

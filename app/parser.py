@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
@@ -15,6 +15,7 @@ KEY_ACTIVITY_NAMES = {
     "If",
     "ForEach",
     "Assign",
+    "MultipleAssign",
     "While",
     "DoWhile",
     "Sequence",
@@ -30,6 +31,7 @@ class WorkflowData:
     invoked_workflows: List[str]
     key_activities: List[str]
     logic_flow: List[Tuple[int, str]] = field(default_factory=list)
+    components: List[str] = field(default_factory=list)
     raw_xml: str | None = None
 
 
@@ -59,6 +61,37 @@ def _collect_key_activities(element: ElementTree.Element, activities: List[str])
         activities.append(element.get("DisplayName") or name)
     for child in element:
         _collect_key_activities(child, activities)
+
+
+SKIP_COMPONENT_NAMES = {
+    "Activity",
+    "TextExpression.NamespacesForImplementation",
+    "NamespacesForImplementation",
+    "Collection",
+    "Array",
+    "String",
+}
+
+
+def _collect_components(element: ElementTree.Element, components: List[str]) -> None:
+    """Recursively collect activity/component display names."""
+    name = get_local_name(element.tag)
+    display = element.get("DisplayName")
+
+    should_include = False
+    if display:
+        should_include = True
+    elif name not in SKIP_COMPONENT_NAMES and name in LOGIC_ACTIVITY_NAMES:
+        should_include = True
+
+    if should_include:
+        label = display or name
+        if display and display != name:
+            label = f"{label} [{name}]"
+        components.append(label)
+
+    for child in element:
+        _collect_components(child, components)
 
 
 def _find_invoked_workflows(element: ElementTree.Element, workflows: List[str]) -> None:
@@ -91,6 +124,7 @@ LOGIC_ACTIVITY_NAMES = KEY_ACTIVITY_NAMES | {
     "StateMachine",
     "Flowchart",
     "FlowStep",
+    "MultipleAssign",
 }
 
 
@@ -112,9 +146,32 @@ DETAIL_ATTRS = (
 
 MAX_DETAIL_LENGTH = 180
 
+CONFIG_KEYS = {
+    "use_llm",
+    "llm_provider",
+    "api_key",
+    "base_url",
+    "model",
+    "format",
+    "prompt",
+    "use_source",
+}
+
+
+def _filter_config(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Return only recognized configuration keys."""
+    return {k: v for k, v in data.items() if k in CONFIG_KEYS}
+
 
 def _extract_logic_detail(element: ElementTree.Element) -> str | None:
     """Extract a concise detail string from common expression-bearing nodes."""
+    tag_name = get_local_name(element.tag)
+
+    if tag_name == "MultipleAssign":
+        detail = _extract_multiple_assign_detail(element)
+        if detail:
+            return detail
+
     for attr in DETAIL_ATTRS:
         val = element.get(attr)
         if val and val.strip():
@@ -136,6 +193,75 @@ def _extract_logic_detail(element: ElementTree.Element) -> str | None:
                 return content[:MAX_DETAIL_LENGTH] + (
                     "…" if len(content) > MAX_DETAIL_LENGTH else ""
                 )
+    return None
+
+
+def _first_text(element: ElementTree.Element) -> str | None:
+    """Return the first meaningful text within an element or its descendants."""
+    if element.text and element.text.strip():
+        return element.text.strip()
+    for child in element.iter():
+        if child is element:
+            continue
+        if child.text and child.text.strip():
+            return child.text.strip()
+    return None
+
+
+def _find_child_text(
+    element: ElementTree.Element, target_names: set[str], max_depth: int = 3
+) -> str | None:
+    """Find the first text content from matching child names up to a depth."""
+    stack: List[Tuple[ElementTree.Element, int]] = [(child, 1) for child in element]
+    while stack:
+        current, depth = stack.pop()
+        child_name = get_local_name(current.tag).split(".")[-1]
+        if child_name in target_names:
+            text = _first_text(current)
+            if text:
+                return text
+        if depth < max_depth:
+            for child in current:
+                stack.append((child, depth + 1))
+    return None
+
+
+def _extract_multiple_assign_detail(element: ElementTree.Element) -> str | None:
+    """Collect assignment pairs within a MultipleAssign activity."""
+    assignments: List[str] = []
+
+    def _walk(node: ElementTree.Element, is_root: bool = False) -> None:
+        node_name = get_local_name(node.tag).split(".")[-1]
+        if not is_root and node_name == "MultipleAssign":
+            return
+
+        if node_name == "Assign":
+            target = node.get("To")
+            if not target:
+                target = _find_child_text(node, {"To"}) or "[target]"
+
+            value = node.get("Value")
+            if not value:
+                value = _find_child_text(
+                    node, {"Value", "Expression", "ExpressionText"}
+                )
+
+            if value is None:
+                return
+
+            statement = f"{target} = {value}".strip()
+            if len(statement) > MAX_DETAIL_LENGTH:
+                statement = statement[:MAX_DETAIL_LENGTH] + "…"
+            assignments.append(statement)
+            return
+
+        for child in node:
+            _walk(child)
+
+    _walk(element, is_root=True)
+
+    if assignments:
+        return "; ".join(assignments)
     return None
 
 
@@ -185,9 +311,11 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
     invoked_workflows: List[str] = []
     key_activities: List[str] = []
     logic_flow: List[Tuple[int, str]] = []
+    components: List[str] = []
 
     _find_invoked_workflows(root, invoked_workflows)
     _collect_key_activities(root, key_activities)
+    _collect_components(root, components)
     for child in root:
         _collect_logic_flow(child, logic_flow)
 
@@ -200,6 +328,7 @@ def parse_workflow(xaml_path: Path, base_dir: Path) -> WorkflowData:
         invoked_workflows=invoked_workflows,
         key_activities=key_activities,
         logic_flow=logic_flow,
+        components=components,
         raw_xml=raw_xml,
     )
 
@@ -222,15 +351,19 @@ def _env_bool(name: str) -> bool | None:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def load_config(config_str: str | None) -> dict:
-    """Safely parse optional JSON config string."""
-    if config_str:
+def load_config(config_input: str | Dict[str, Any] | None) -> dict:
+    """Safely parse optional JSON config string or dict."""
+    if isinstance(config_input, dict):
+        parsed = dict(config_input)
+    elif config_input:
         try:
-            parsed = json.loads(config_str)
+            parsed = json.loads(config_input)
         except json.JSONDecodeError:
             parsed = {}
     else:
         parsed = {}
+
+    parsed = _filter_config(parsed) if isinstance(parsed, dict) else {}
 
     env_defaults = {
         "use_llm": _env_bool("LLM_USE_LLM") or _env_bool("USE_LLM"),

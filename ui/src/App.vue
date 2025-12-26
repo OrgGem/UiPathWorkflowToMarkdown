@@ -44,7 +44,7 @@ const closeFileViewer = () => {
       <!-- Header -->
       <header class="text-center mb-10">
         <h1 class="text-4xl font-semibold mb-2 text-white">
-          UiPath Workflow Analyzer
+          RPA
         </h1>
         <p class="text-gray-400 text-base">
           Upload, analyze, and process UiPath workflows with optional LLM enhancement
@@ -71,13 +71,13 @@ const closeFileViewer = () => {
             @update="handleFilesUpdate"
             @view-file="handleViewFile"
           />
-          <ProcessCard :files="files" />
+          <ProcessCard :files="files" :llm-config="llmConfig" />
         </div>
       </div>
 
       <!-- Footer -->
       <footer class="text-center mt-12 text-gray-600 text-xs">
-        <p>Vue 3 + Vite + TypeScript</p>
+         <p>RPA</p>
       </footer>
     </div>
 
